@@ -1,0 +1,168 @@
+{
+ "found": 40,
+ "id": 27169,
+ "kind": "varbit",
+ "note": "every clientscript that names it. rs3_script_read shows one whole, and rs3_script searches their text when what you want really is a string.",
+ "scripts": [
+  {
+   "mentions": 1,
+   "script": "clientscript-10123"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-10158"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-10399"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-1058"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-11312"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-11348"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-11497"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-11807"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-11839"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-1186"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-11990"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-11997"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-12002"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-12005"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-12235"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-12342"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-1237"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-1241"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-12431"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-12542"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-12543"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-12600"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-1264"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-1267"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-1306"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13286"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13531"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13537"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-1364"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13689"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13691"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13766"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13845"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13852"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13858"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13859"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-13881"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-15317"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-1558"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-15841"
+  }
+ ]
+}

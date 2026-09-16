@@ -1,0 +1,28 @@
+# fontmetrics: glyph sizes and where each glyph sits on its sprite sheet. Kind 2 is a vector font,
+# which only names its source and size.
+
+type fontmetrics
+index 58
+layout groups
+
+record {
+  u8 kind
+  {
+    u8 complexKerning
+    i32 source if kind==1
+    list[256]<u8> widths
+    list[256]<u8> heights
+    list[256]<u8> bearingY
+    u16 sheetWidth
+    u16 sheetHeight
+    list[256]<u16> x
+    list[256]<u16> y
+    i8 baseline if complexKerning!=1
+    u8 upperAscent
+    u8 median
+    u8 maxAscent
+    u8 maxDescent
+    u8 scale
+  } sprite if kind!=2
+  {u32 source; u8 size} vector if kind==2
+}

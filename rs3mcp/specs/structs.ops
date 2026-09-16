@@ -1,0 +1,6 @@
+# structs: a bag of params and nothing else
+
+type structs
+index 22
+
+0xF9 params          params

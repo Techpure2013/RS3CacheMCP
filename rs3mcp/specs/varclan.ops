@@ -1,0 +1,8 @@
+# varclan: clan vars. Config page 66. type is the script type a clientscript reads the var as.
+
+type varclan
+index 2
+group 66
+
+0x03 type            u8
+0x04 unk04           u8

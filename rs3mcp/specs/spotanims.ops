@@ -1,0 +1,17 @@
+# spotanims: graphics played on a tile or an entity, a model and the animation that moves it.
+
+type spotanims
+index 21
+
+0x01 model           varu32 -> models
+0x02 animation       varu32 -> sequences
+0x04 scaleXZ         u16
+0x05 scaleY          u16
+0x06 rotation        u16
+0x07 ambient         i8
+0x08 contrast        i8
+0x0A unk0A           true
+0x28 recolour        list[u8]<{u16 from; u16 to}>
+0x29 retexture       list[u8]<{u16 from -> materials; u16 to -> materials}>
+0x2C unk2C           u16
+0x2E unk2E           true

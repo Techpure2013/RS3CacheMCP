@@ -1,0 +1,9 @@
+# quickchatcats: the quick chat menus, each holding menus and lines.
+
+type quickchatcats
+index 24
+group 0
+
+0x01 text            string
+0x02 menus           list[u8]<{u16 id -> quickchatcats; u8 hotkey}>
+0x03 lines           list[u8]<{u16 id -> quickchatlines; u8 hotkey}>

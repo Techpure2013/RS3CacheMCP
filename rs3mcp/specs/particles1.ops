@@ -1,0 +1,13 @@
+# particles1: the second particle table. Nothing here is named yet.
+
+type particles1
+index 27
+group 1
+
+0x01 unk01           {u8 a; i8 b}
+0x03 unk03           list[6]<i16>
+0x04 unk04           {u8 a; u16 b; u16 c}
+0x06 unk06           u8
+0x08 unk08           true
+0x09 unk09           true
+0x0A unk0A           true

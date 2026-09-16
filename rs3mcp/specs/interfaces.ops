@@ -1,0 +1,86 @@
+# interfaces: every component of every interface. The id is interface << 16 | component. Version
+# -1 is the oldest form; the fields that came later check the version before they are read.
+
+type interfaces
+index 3
+layout files
+
+record {
+  i8 version
+  u8 kind
+  string name if kind&0x80
+  u16 contentType
+  i16 x
+  i16 y
+  i16 width
+  i16 height
+  i8 widthMode
+  i8 heightMode
+  i8 xMode
+  i8 yMode
+  u16 parent
+  u8 hidden
+  {u16 scrollWidth; u16 scrollHeight; u32 scrollHeightWide if scrollHeight&0x8000; bool noHover if version==-1; u32 unk1 if version>=6; u32 unk2 if version==6} layer if kind==0
+  {u32 colour; u8 filled; i8 alpha} rectangle if kind==3
+  {varu32 font; u8 unk1 if version>=0; string text; u8 unk2; u8 alignX; u8 alignY; bool shadow; u32 colour; u8 alpha; u8 lines if version>=0} text if kind==4
+  {i32 sprite; u16 rotation; u8 tiling; u32 widthData if widthMode==4; u32 heightData if heightMode==4; u8 alpha; u8 border; i32 unk2; bool flipV; bool flipH; u32 colour; u8 clickMask if version>=0; u32 unk6 if version>=6} sprite if kind==5
+  {varu32 model -> models; u8 mode; {i16 x; i16 y; i16 extra if mode==2; u16 rotX; u16 rotY; u16 rotZ; u16 zoom} position if mode!=0; varu32 animation -> sequences; u16 widthData if widthMode!=0; u16 heightData if heightMode!=0} model if kind==6
+  {u8 width; u32 colour; bool vertical} line if kind==9
+  {bytes[41] a; string text; bytes[10] b} unk10 if kind==10
+  bytes[6] unk11 if kind==11
+  {bytes[36] a; string text; bytes[10] b} unk12 if kind==12
+  bytes[125] unk13 if kind==13
+  bytes[10] unk15 if kind==15
+  {bytes[5] head; u32 extra; bytes[175] rest if extra==0; bytes[225] restLong if extra!=0} unk16 if kind==16
+  u32 unkFFFF if version>=6
+  u16 optMask
+  u8 unk2
+  u8 unkPrePre3 if version>=7
+  u8 unkPre3 if version>=6
+  list[end 0x00]<bytes[4]> unk3 if version==-1
+  {u8 op; bytes[4] data if op!=0 or kind==13 or kind==16} unk3b if version>=0
+  string name2
+  u8 menuCounts
+  list[menuCounts&15]<string> options
+  list[menuCounts>>4]<{u8 op; u16 cursor}> optionCursors
+  string unkString1 if optMask!&0x400
+  u8 unk4
+  u8 bit4 if optMask&0x400
+  u8 unk5
+  u8 unk6
+  string unkString2
+  bytes[6] unkBit40 if optMask&0x240
+  {u16 cursor; u16 _more; bytes[6] more if _more!=0} v0 if version>=0
+  {
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> load
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> mouseHover
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> mouseLeave
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk0
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk1
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk2
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk3
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk4
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk5
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk6
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk7 if version>=0
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> hoverText
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk8
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk9
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk10
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk11
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk12
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk13
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk14
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk15
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk16
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk17 if version>=6
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk18 if version>=6
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk19 if version>=6
+    list[u8]<{u8 kind; i32 int if kind==0; string text if kind==1}> unk20 if version>=7
+    list[u8]<i32> ints0
+    list[u8]<i32> ints1
+    list[u8]<i32> ints2
+    list[u8]<i32> ints3
+    list[u8]<i32> ints4
+  } hooks
+}

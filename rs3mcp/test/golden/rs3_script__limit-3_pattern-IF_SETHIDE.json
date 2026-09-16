@@ -1,0 +1,33 @@
+{
+ "filesMatched": 1,
+ "filesScanned": 1,
+ "found": 3,
+ "hits": [
+  {
+   "code": "    }\n    if (varplayer_4517 == 1) {\n        if_sethide(true, comp(753, 1));\n        if_sethide(false, comp(753, 96));\n        if_sethide(true, comp(753, 107));",
+   "file": "clientscript-3.ts",
+   "line": 10,
+   "script": 3,
+   "tag": null
+  },
+  {
+   "code": "    if (varplayer_4517 == 1) {\n        if_sethide(true, comp(753, 1));\n        if_sethide(false, comp(753, 96));\n        if_sethide(true, comp(753, 107));\n        return;",
+   "file": "clientscript-3.ts",
+   "line": 11,
+   "script": 3,
+   "tag": null
+  },
+  {
+   "code": "        if_sethide(true, comp(753, 1));\n        if_sethide(false, comp(753, 96));\n        if_sethide(true, comp(753, 107));\n        return;\n    }",
+   "file": "clientscript-3.ts",
+   "line": 12,
+   "script": 3,
+   "tag": null
+  }
+ ],
+ "nextStart": 3,
+ "note": "more hits exist; pass start=3 for the next 3",
+ "shown": 3,
+ "start": 0,
+ "truncated": true
+}

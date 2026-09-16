@@ -1,0 +1,7 @@
+{
+ "found": 1,
+ "lines": 30,
+ "script": 0,
+ "source": "//[proc,quicksort]\nfunction script0(int0: int, int1: int, int2: int): void {\n    let int3: int, int4: component, int5: int, int6: int, int7: int;\n    int3 = (int1 + int2) / 2;\n    int4 = array0[int3];\n    array0[int3] = array0[int2];\n    array0[int2] = int4;\n    int5 = int1;\n    int6 = int1;\n    int7 = -1;\n    while (int6 < int2) {\n        if (compare(lowercase(if_gettext(array0[int6])), lowercase(if_gettext(int4))) < int6 & 1) {\n            int7 = array0[int6];\n            array0[int6] = array0[int5];\n            array0[int5] = int7;\n            int5 = int5 + 1;\n        }\n        int6 = int6 + 1;\n    }\n    array0[int2] = array0[int5];\n    array0[int5] = int4;\n    if (int1 < int5 - 1) {\n        script0(0, int1, int5 - 1);\n    }\n    if (int5 + 1 < int2) {\n        script0(0, int5 + 1, int2);\n    }\n    return;\n}\n",
+ "tag": "proc,quicksort"
+}

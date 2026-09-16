@@ -1,0 +1,8 @@
+# varobject: object vars. Config page 65. type is the script type a clientscript reads the var as.
+
+type varobject
+index 2
+group 65
+
+0x03 type            u8
+0x04 unk04           u8

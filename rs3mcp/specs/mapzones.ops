@@ -1,0 +1,16 @@
+# mapzones: the world map's areas, each a set of rectangles copied from the world into the map.
+
+type mapzones
+index 23
+group 0
+
+record {
+  string internalName
+  string name
+  u32 centre
+  u32 unk1
+  bool shown
+  u8 zoom
+  u8 unk2
+  list<{u8 plane; u16 fromX; u16 fromZ; u16 toX; u16 toZ; u16 mapFromX; u16 mapFromZ; u16 mapToX; u16 mapToZ}> bounds
+}

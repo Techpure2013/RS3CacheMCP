@@ -1,0 +1,37 @@
+# achievements: every achievement, its category, and what it takes to complete.
+# The lists of progress share one entry: a kind, the value to reach, the label the interface shows,
+# and the vars that count. The 0x2x opcodes are the same lists with wider var ids.
+
+type achievements
+index 57
+
+0x01 name            pstring
+0x02 description     list[u8]<{u8 kind; pstring text}>
+0x03 category        u16
+0x04 sprite          varu32 -> sprites
+0x05 runescore       u8
+0x06 unk06           u16
+0x07 reward          pstring
+0x08 skills          list<{u8 ironman; u8 level; pstring text; list[u8]<u16> skills}>
+0x09 varps           list<{u8 kind; varu32 target; pstring text; list[u8]<u16 -> varplayer> vars}>
+0x0B previous        list<u24 -> achievements>
+0x0C skills2         list<{u8 ironman; u8 level; pstring text; list[u8]<u16> skills}>
+0x0D progress        list<{u8 kind; varu32 target; pstring text; list[u8]<u16> vars}>
+0x0F children        list<u24 -> achievements>
+0x10 subcategory     u16
+0x11 unk11           true
+0x12 hidden          u8
+0x13 free            true
+0x14 quests          list<u24 -> quests>
+0x15 questsDone      list<u24 -> quests>
+0x17 bits            list<{u8 kind; u16 var; u8 unk; pstring text if kind==0; u16 need if kind==1; u8 bit}>
+0x1A unk1A           u16
+0x1B unk1B           true
+0x1C skillCount      list[u8]<u8>
+0x1D unk1D           u8
+0x1E progressCount   list<varu16>
+0x1F unk1F           u8
+0x20 unk20           u24
+0x21 wideVarps       list<{u8 kind; varu32 target; pstring text; list[u8]<u24> vars}>
+0x23 wideProgress    list<{u8 kind; varu32 target; pstring text; list[u8]<u24> vars}>
+0x24 wideBits        list<{u8 kind; u24 var; u8 unk; pstring text if kind==0; u16 need if kind==1; u8 bit}>

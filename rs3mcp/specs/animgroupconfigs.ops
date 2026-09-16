@@ -1,0 +1,31 @@
+# animgroupconfigs: the set of animations an npc or player moves with. An animation id of 32767 is
+# none, which is what the two byte form holds when it is empty.
+
+type animgroupconfigs
+index 2
+group 32
+
+0x01 base            {varu32 idle -> sequences; varu32 walk -> sequences}
+0x02 unk02           varu32 -> sequences
+0x03 unk03           varu32 -> sequences
+0x04 unk04           varu32 -> sequences
+0x05 unk05           varu32 -> sequences
+0x06 run             varu32 -> sequences
+0x07 unk07           varu32 -> sequences
+0x08 unk08           varu32 -> sequences
+0x09 unk09           varu32 -> sequences
+0x1A unk1A           {u8 a; u8 b}
+0x26 unk26           varu32 -> sequences
+0x27 unk27           varu32 -> sequences
+0x28 unk28           varu32 -> sequences
+0x29 unk29           varu32 -> sequences
+0x2A unk2A           varu32 -> sequences
+0x2E unk2E           varu32 -> sequences
+0x2F unk2F           varu32 -> sequences
+0x30 unk30           varu32 -> sequences
+0x31 unk31           varu32 -> sequences
+0x32 unk32           varu32 -> sequences
+0x33 unk33           varu32 -> sequences
+0x34 randomIdles     list[u8]<{varu32 anim -> sequences; u8 weight; u8 unk}>
+0x35 unk35           true
+0x36 unk36           {u8 a; u8 b}

@@ -1,0 +1,7 @@
+# varregion: region vars. Config page 64. type is the script type a clientscript reads the var as.
+
+type varregion
+index 2
+group 64
+
+0x03 type            u8

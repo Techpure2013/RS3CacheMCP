@@ -1,0 +1,94 @@
+# items: the 90 opcodes today's cache uses.
+# unkXX is a field we can read and cannot name yet.
+
+type items
+index 19
+
+0x02 name            string
+0x03 examine         string
+0x04 zoom            u16                         # inventory icon
+0x05 pitch           u16
+0x06 yaw             u16
+0x07 offsetX         i16
+0x08 offsetY         i16
+0x09 model           list<varu32 -> models>
+0x0B stackable       true
+0x0D wearSlot        u8
+0x0E wearHides       u8
+0x0F unk0F           true
+0x10 members         true
+0x17 maleModel       varu32 -> models
+0x18 maleModel2      varu32 -> models
+0x19 femaleModel     varu32 -> models
+0x1A femaleModel2    varu32 -> models
+0x1B wearHides2      u8
+0x1E groundOption1   string
+0x20 groundOption3   string
+0x21 groundOption4   string
+0x22 groundOption5   string
+0x23 option1         string
+0x24 option2         string
+0x25 option3         string
+0x26 option4         string
+0x27 option5         string
+0x28 recolour        list<{u16 from; u16 to}>
+0x29 retexture       list<{u16 from -> materials; u16 to -> materials}>
+0x2C recolourSlot    u16
+0x2D retextureSlot   u16
+0x41 tradeable       true
+0x45 geLimit         i32
+0x4E maleModel3      varu32 -> models
+0x4F femaleModel3    varu32 -> models
+0x5A maleHead        varu32 -> models
+0x5B femaleHead      varu32 -> models
+0x5C maleHead2       varu32 -> models
+0x5D femaleHead2     varu32 -> models
+0x5E category        u16
+0x5F roll            u16
+0x60 dummy           u8
+0x6E scaleX          u16
+0x6F scaleY          u16
+0x70 scaleZ          u16
+0x71 ambient         i8
+0x72 contrast        i8
+0x73 team            u8
+0x7D maleOffset      {u8 x; u8 y; u8 z}
+0x7E femaleOffset    {u8 x; u8 y; u8 z}
+0x84 quests          list<u16 -> quests>
+0x86 pickSizeShift   u8
+0x8E groundCursor1   u16
+0x90 unk90           u16                         # on nearly every item, so not the cursor it sits among
+0x91 groundCursor4   u16
+0x92 groundCursor5   u16
+0x96 optionCursor1   u16
+0x97 optionCursor2   u16
+0x98 optionCursor3   u16
+0x99 optionCursor4   u16
+0x9A optionCursor5   u16
+0x9D randomGroundPos true
+0xA3 shardCount      u16
+0xA4 shardName       string
+0xA5 neverStacks     true
+0xA7 unkA7           true
+0xA8 unkA8           true
+0xB2 unkB2           true
+0xB5 value           {i32 high; i32 low}
+0xB6 unkB6           u24
+0xBE stack1          {u24 item -> items; u16 count}
+0xBF stack2          {u24 item -> items; u16 count}
+0xC0 stack3          {u24 item -> items; u16 count}
+0xC1 stack4          {u24 item -> items; u16 count}
+0xC2 stack5          {u24 item -> items; u16 count}
+0xC3 stack6          {u24 item -> items; u16 count}
+0xC4 stack7          {u24 item -> items; u16 count}
+0xC5 stack8          {u24 item -> items; u16 count}
+0xC6 stack9          {u24 item -> items; u16 count}
+0xC9 noteLink        u24 -> items
+0xCA noteTemplate    u24 -> items
+0xCB lentLink        u24 -> items
+0xCC lentTemplate    u24 -> items
+0xCD boughtLink      u24 -> items
+0xCE boughtTemplate  u24 -> items
+0xCF shardLink       u24 -> items
+0xD0 shardTemplate   u24 -> items
+0xF9 params          params

@@ -1,0 +1,7 @@
+# varnpc: npc vars. Config page 61. type is the script type a clientscript reads the var as.
+
+type varnpc
+index 2
+group 61
+
+0x03 type            u8

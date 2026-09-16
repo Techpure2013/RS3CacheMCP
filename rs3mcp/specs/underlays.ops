@@ -1,0 +1,11 @@
+# underlays: the ground under a tile, grass and dirt. Config page 1.
+
+type underlays
+index 2
+group 1
+
+0x01 colour          {u8 r; u8 g; u8 b}
+0x02 material        u16 -> materials
+0x03 materialScale   u16
+0x04 unk04           true
+0x05 unk05           true

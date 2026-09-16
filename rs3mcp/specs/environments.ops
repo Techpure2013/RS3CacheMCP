@@ -1,0 +1,10 @@
+# environments: config page 29.
+
+type environments
+index 2
+group 29
+
+0x01 unk01           u16
+0x04 unk04           bool
+0x05 model           varu32 -> models
+0x06 unk06           u16

@@ -1,0 +1,10 @@
+# varbits: a slice of a var. var packs the var's domain in the top byte and its id below.
+# Config page 69.
+
+type varbits
+index 2
+group 69
+
+0x01 var             u24
+0x02 bits            {u8 low; u8 high}
+0x10 unk10           true

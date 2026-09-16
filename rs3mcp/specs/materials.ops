@@ -1,0 +1,62 @@
+# materials: textures and how a model surface uses them. Three versions share an index. In
+# version 1 and 2 a bit of flags decides whether each field after it is there.
+
+type materials
+index 26
+
+record {
+  u8 version
+  {
+    u8 unk0
+    u16 textureSize
+    u8 _opt
+    {u8 a; u16 b} opt if _opt==16
+    list[end 0x00]<{u8 op; u16 value}> ops
+    u8 textureFlags
+    u32 diffuse -> textures if textureFlags&0x11
+    u32 normal -> textures if textureFlags&0x0A
+    u8 repeat
+    u8 sky0
+    u8 sky1
+    u8 sky2
+    u8 flags2
+    {f32 a; f32 b} floats if flags2&0x10
+    u8 unk7
+    bytes[19] unk7Data if unk7==255
+    u8 diffuse1 if textureFlags&0x10
+    bytes[4] normalData if textureFlags&0x02
+    {u8 kind; u8 data if kind==2} diffuse2 if textureFlags&0x01
+    u8 alphaMode
+    u8 alphaCutoff if alphaMode==1
+    u8 animFlags
+    i16 animU if animFlags&0x01
+    i16 animV if animFlags&0x02
+    f32 unkFloat if sky1&0x80
+    u8 _extra
+    {u8 flags; u8 unk1; u8 unk2; bytes[4] unk3; bool unk4; u8 unk5; bool unk6; bool unk7; u8 specular; u8 baseColourShare; u16 baseColour} extra if _extra==1
+  } v0 if version==0
+  {
+    u32 flags
+    {u8 size; u32 texture -> textures} diffuse if flags&0x20
+    {u8 size; u32 texture -> textures} normal if flags&0x40
+    {u8 size; u32 texture -> textures} compound if flags&0x80
+    f32 unk13 if flags&0x2000
+    {u16 a; u16 b} unk14 if flags&0x4000
+    f32 unk15 if flags&0x8000
+    f32 unk18 if flags&0x40000
+    f32 unk16 if flags&0x10000
+    f32 unk12 if flags&0x1000
+    {f32 a; f32 b; f32 c} unk11 if flags&0x800
+    {f32 a; f32 b; f32 c; f32 d; f32 e} unk19 if flags&0x80000
+    f32 normalScale if flags&0x40
+    f32 unk17 if flags&0x20000
+    i16 animU if flags&0x100
+    i16 animV if flags&0x200
+    u16 unk0901
+    u8 unkByte
+    u8 alphaMode
+    u8 alphaCutoff if alphaMode==1
+    u16 unkFFFF
+    u8 last
+  } v1 if version!=0
+}

@@ -1,0 +1,8 @@
+# dbtables: the column layout of each db table, and a default for the columns that have one.
+# Config page 40.
+
+type dbtables
+index 2
+group 40
+
+0x02 columns         {u32 unk; u8 count; list[end 0xFF]<{u8 id; u8 unk; u8 _n; list[_n]<varu16> types; u8 flags; {dbvalues[types] values; u8 unk} default if flags&2}> columns}

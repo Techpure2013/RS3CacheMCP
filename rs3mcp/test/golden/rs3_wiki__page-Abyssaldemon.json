@@ -1,0 +1,314 @@
+{
+ "chars": 25301,
+ "dropCount": 23,
+ "drops": [
+  {
+   "item": "Infernal ashes",
+   "itemIds": [
+    20268,
+    22312
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "Always"
+  },
+  {
+   "item": "Binding contract (abyssal demon)",
+   "itemIds": [
+    49402
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "Always"
+  },
+  {
+   "item": "Abyssal wand",
+   "itemIds": [
+    30825
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "1/6104"
+  },
+  {
+   "item": "Abyssal orb",
+   "itemIds": [
+    30828
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "1/6104"
+  },
+  {
+   "item": "Abyssal whip",
+   "itemIds": [
+    4151,
+    4178,
+    14661,
+    15441,
+    15442,
+    15443
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "1/1024"
+  },
+  {
+   "item": "Uncut ruby",
+   "itemIds": [
+    1619,
+    20913
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "14/128"
+  },
+  {
+   "item": "Uncut diamond",
+   "itemIds": [
+    1617
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "6/128"
+  },
+  {
+   "item": "Uncut dragonstone",
+   "itemIds": [
+    1631
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "2/128"
+  },
+  {
+   "item": "Orichalcite stone spirit",
+   "itemIds": [
+    44809
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "4/128"
+  },
+  {
+   "item": "Phasmatite stone spirit",
+   "itemIds": [
+    44812
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "4/128"
+  },
+  {
+   "item": "Medium bladed adamant salvage",
+   "itemIds": [
+    47240
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "12/128"
+  },
+  {
+   "item": "Tiny spiky rune salvage",
+   "itemIds": [
+    47286
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "8/128"
+  },
+  {
+   "item": "Tiny plated rune salvage",
+   "itemIds": [
+    47306
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "4/128"
+  },
+  {
+   "item": "Large plated rune salvage",
+   "itemIds": [
+    47312
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "4/128"
+  },
+  {
+   "item": "Coins",
+   "itemIds": [
+    617,
+    995,
+    8890,
+    20923,
+    20924,
+    20925
+   ],
+   "note": null,
+   "quantity": "1920-2880",
+   "rarity": "18/128"
+  },
+  {
+   "item": "Coins",
+   "itemIds": [
+    617,
+    995,
+    8890,
+    20923,
+    20924,
+    20925
+   ],
+   "note": null,
+   "quantity": "2400-3600",
+   "rarity": "14/128"
+  },
+  {
+   "item": "Shark",
+   "itemIds": [
+    385,
+    24841
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "14/128"
+  },
+  {
+   "item": "Pure essence",
+   "itemIds": [
+    7936,
+    37584
+   ],
+   "note": null,
+   "quantity": "72-88 (noted)",
+   "rarity": "12/128"
+  },
+  {
+   "item": "Magic logs",
+   "itemIds": [
+    1513
+   ],
+   "note": null,
+   "quantity": "6 (noted)",
+   "rarity": "6/128"
+  },
+  {
+   "item": "Fire orb",
+   "itemIds": [
+    569
+   ],
+   "note": null,
+   "quantity": "2 (noted)",
+   "rarity": "6/128"
+  },
+  {
+   "item": "Ferocious ring (5)",
+   "itemIds": [
+    15398
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "1/160"
+  },
+  {
+   "item": "Sealed clue scroll (hard)",
+   "itemIds": [
+    42008
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "1/128"
+  },
+  {
+   "item": "Abyssal head",
+   "itemIds": [
+    7979,
+    7986,
+    8264
+   ],
+   "note": null,
+   "quantity": "1",
+   "rarity": "1/6000"
+  }
+ ],
+ "infobox": {
+  "acc_magic": "0",
+  "acc_melee": "1486",
+  "acc_necromancy": "0",
+  "acc_ranged": "0",
+  "aff_magic": "70",
+  "aff_melee": "60",
+  "aff_ranged": "50",
+  "aff_weakness": "90",
+  "aggressive": "No",
+  "armour": "1608",
+  "attack": "70",
+  "defence": "70",
+  "examine": "A denizen of the Abyss!",
+  "id": "1615, 29342",
+  "image": "250px",
+  "immune_to_deflect": "No",
+  "immune_to_drain": "No",
+  "immune_to_poison": "No",
+  "immune_to_stun": "No",
+  "leagueRegion": "Misthalin, Kandarin,Morytania,Wilderness,Tirannwn",
+  "level": "98",
+  "lifepoints": "8500",
+  "magic": "1",
+  "max_magic": "0",
+  "max_melee": "672",
+  "max_necromancy": "0",
+  "max_ranged": "0",
+  "max_spec": "0",
+  "members": "Yes",
+  "name": "Abyssal demon",
+  "necromancy": "1",
+  "options": "Attack",
+  "poisonous": "No",
+  "primarystyle": "melee",
+  "ranged": "1",
+  "release": "26 January 2005",
+  "slayercat": "Abyssal demons, Demons",
+  "slaylvl": "85",
+  "slayxp": "277.2",
+  "speed": "4",
+  "style": "melee",
+  "susceptibility": "Abyssal, Demon",
+  "update": "Slayer Skill",
+  "weakness": "Slash"
+ },
+ "infoboxType": "Infobox Monster",
+ "note": "infobox and drops are parsed from the page templates, not from rendered html. Pass raw=true for the source. Rarity strings are the wiki's own wording, and sharedDropTables are whole tables named by one template rather than listed out, so a drop list is only complete with those too.",
+ "page": "Abyssal demon",
+ "resolvedToCacheIds": "23 of 23",
+ "sharedDropTables": [
+  {
+   "params": {
+    "slayer_level": "85"
+   },
+   "table": "BoneFragments"
+  },
+  {
+   "params": {
+    "altrarity": "1/1940"
+   },
+   "table": "Triskelion"
+  },
+  {
+   "params": {
+    "level": "98"
+   },
+   "table": "Effigy"
+  },
+  {
+   "params": {},
+   "table": "SpiritGems"
+  },
+  {
+   "params": {
+    "level": "98"
+   },
+   "table": "Mimic"
+  }
+ ]
+}

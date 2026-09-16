@@ -1,0 +1,18 @@
+# overlays: the paint laid over a tile, paths and floors. Config page 4.
+
+type overlays
+index 2
+group 4
+
+0x01 colour          {u8 r; u8 g; u8 b}
+0x03 material        u16 -> materials
+0x05 unk05           true
+0x07 colour2         {u8 r; u8 g; u8 b}
+0x08 unk08           true
+0x09 materialScale   u16
+0x0A unk0A           true
+0x0B blendPriority   u8
+0x0C blendsUnder     true
+0x0D colour3         {u8 r; u8 g; u8 b}
+0x0E unk0E           u8
+0x10 unk10           u8

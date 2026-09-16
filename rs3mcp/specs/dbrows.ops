@@ -1,0 +1,9 @@
+# dbrows: one row of a db table, each column holding a value per type for each of its rows.
+# Config page 41.
+
+type dbrows
+index 2
+group 41
+
+0x03 columns         {u8 count; list[end 0xFF]<{u8 id; u8 _n; list[_n]<varu16> types; dbvalues[types] values}> columns}
+0x04 table           leb128 -> dbtables

@@ -1,0 +1,11 @@
+# mapscenes: the small pictures the world map draws for a loc. Config page 34.
+
+type mapscenes
+index 2
+group 34
+
+0x01 sprite          varu32 -> sprites
+0x02 colour          u24
+0x03 unk03           true
+0x04 unk04           true
+0x05 unk05           true

@@ -1,0 +1,8 @@
+# params: the keys a params map on an item, npc, loc or struct can hold. Config page 11.
+
+type params
+index 2
+group 11
+
+0x04 unk04           true
+0x65 type            {varu16 varType; u8 base; i32 defaultInt if base==2; string defaultString if base==5}

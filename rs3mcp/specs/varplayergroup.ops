@@ -1,0 +1,7 @@
+# varplayergroup: player group vars. Config page 75. type is the script type a clientscript reads the var as.
+
+type varplayergroup
+index 2
+group 75
+
+0x03 type            u8

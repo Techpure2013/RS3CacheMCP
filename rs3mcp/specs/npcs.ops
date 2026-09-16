@@ -1,0 +1,80 @@
+# npcs: the 69 opcodes today's cache uses. Nothing here predates the build on disk. 0x03, examine,
+# is gone: the records that seemed to carry it were misread after 0xBD.
+# unkXX is a field we can read and cannot name yet. A guess at a name is worse than an honest one.
+
+type npcs
+index 18
+
+0x01 models          list<varu32 -> models>
+0x02 name            string
+0x0B unk0B           u8
+0x0C size            u8                          # tiles along one side
+0x1E option1         string
+0x1F option2         string
+0x20 option3         string
+0x21 option4         string
+0x22 option5         string
+0x28 recolour        list<{u16 from; u16 to}>
+0x29 retexture       list<{u16 from -> materials; u16 to -> materials}>
+0x2C recolourSlot    u16
+0x2D retextureSlot   u16
+0x3C headModels      list<varu32 -> models>
+0x5D noMinimapDot    false
+0x5F combatLevel     u16
+0x61 scaleXZ         u16
+0x62 scaleY          u16
+0x63 unk63           true
+0x64 ambient         i8
+0x65 contrast        i8
+0x66 headIcon        u16
+0x67 unk67           u16
+0x6B unk6B           false
+0x6D slowWalk        false
+0x6F animateIdle     false
+0x71 shadow          {u16 src; u16 dst}
+0x72 shadowAlpha     {i8 src; i8 dst}
+0x77 movement        i8
+0x79 translations    list<bytes[4]>
+0x7B iconHeight      u16
+0x7D respawnFacing   i8
+0x7F animGroup       u16 -> animgroupconfigs
+0x80 movementType    i8
+0x86 ambientSound    {u16 a; u16 b; u16 c; u16 d; u8 e}
+0x89 attackCursor    u16
+0x8C unk8C           u8
+0x8D unk8D           true
+0x8E mapFunction     u16
+0x8F unk8F           true
+0x96 memberOption1   string
+0x97 memberOption2   string
+0x98 memberOption3   string
+0x99 memberOption4   string
+0x9A memberOption5   string
+0x9B unk9B           {i8 a; i8 b; i8 c; i8 d}
+0x9E unk9E           true
+0x9F unk9F           false
+0xA0 quests          list<u16 -> quests>
+0xA3 unkA3           u8
+0xA4 unkA4           {u16 a; u16 b}
+0xA5 unkA5           u8
+0xA9 unkA9           false
+0xAA optionCursor1   u16
+0xAC optionCursor3   u16
+0xAD optionCursor4   u16
+0xAE optionCursor5   u16
+0xB2 unkB2           true
+0xB3 unkB3           {vari16 a; vari16 b; vari16 c; vari16 d; vari16 e; vari16 f}
+0xB6 unkB6           true
+0xB7 unkB7           u8
+0xB8 unkB8           u8
+0xB9 unkB9           true
+# The morph tables since the 2026-09-09 update, read off the bytes. var is the varbit or varp that
+# picks the appearance; fallback is shown when it reads past the list.
+0xBB morphs          {u8 _flags; u32 var -> vars; list[varu16]<u16 -> npcs> ids; u16 fallback -> npcs}
+0xBC morphsWide      {u8 _flags; u32 var -> vars; varu32 fallback -> npcs; list[varu16]<varu32 -> npcs> ids; varu32 unk -> npcs}
+# A sized block: two bytes of length, then that many. Reading its inside as fixed groups plus the
+# params after it broke 35 records; the params are 0xF9, a separate opcode, and the groups vary.
+0xBD unkBD           {u16 _size; bytes[_size] body}
+0xDB unkDB           u8
+0xF9 params          params
+0xFD unkFD           u8

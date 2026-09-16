@@ -1,0 +1,39 @@
+# particles0: particle emitters. Nothing here is named yet, so every field keeps its opcode.
+
+type particles0
+index 27
+group 0
+
+0x01 unk01           list[4]<u16>
+0x03 unk03           list[4]<u16>
+0x04 unk04           u16
+0x05 unk05           u16
+0x06 unk06           bytes[8]
+0x07 unk07           {u16 a; u16 b}
+0x08 unk08           {u16 a; u16 b}
+0x09 unk09           list[u8]<u16>
+0x0A unk0A           list[u8]<u16>
+0x0C unk0C           u8
+0x0D unk0D           u8
+0x0E unk0E           u16
+0x0F unk0F           u16
+0x10 unk10           {u8 a; i16 b; i16 c; u8 d}
+0x12 unk12           bytes[4]
+0x13 unk13           u8
+0x14 unk14           u8
+0x15 unk15           u8
+0x16 unk16           {u16 a; u16 b}
+0x17 unk17           u8
+0x18 unk18           u8
+0x19 unk19           list[u8]<u16>
+0x1A unk1A           true
+0x1B unk1B           u16
+0x1C unk1C           u8
+0x1D unk1D           {list[u8]<u16> a; u16 b}
+0x1E unk1E           true
+0x1F unk1F           {u16 a; u16 b}
+0x20 unk20           true
+0x21 unk21           true
+0x22 unk22           true
+0x23 unk23           {list[u8]<{i16 a; u8 b}> a; u16 b}
+0x24 unk24           true

@@ -1,0 +1,7 @@
+# varcampaign: campaign vars. Config page 68. type is the script type a clientscript reads the var as.
+
+type varcampaign
+index 2
+group 68
+
+0x03 type            u8

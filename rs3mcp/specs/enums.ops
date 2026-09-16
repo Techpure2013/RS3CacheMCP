@@ -1,0 +1,18 @@
+# enums: a key type, a value type, a default, then the pairs. 0x07 and 0x08 are the dense form,
+# a size and then only the slots that are set.
+
+type enums
+index 17
+
+0x01 keyChar         u8                          # the old one byte type code
+0x02 valueChar       u8
+0x03 defaultString   string
+0x04 defaultInt      i32
+0x05 strings         list[u16]<{i32 key; string value}>
+0x06 ints            list[u16]<{i32 key; i32 value}>
+0x07 stringArray     {u16 size; list[u16]<{u16 index; string value}> values}
+0x08 intArray        {u16 size; list[u16]<{u16 index; i32 value}> values}
+0x65 keyType         u8
+0x66 valueType       u8
+0x83 unk83           true
+0xD1 unkD1           true

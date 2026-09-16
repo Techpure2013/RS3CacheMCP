@@ -1,0 +1,12 @@
+# identitykit: the body parts a player's look is built from. Config page 3.
+
+type identitykit
+index 2
+group 3
+
+0x01 bodyPart        u8
+0x02 models          list[u8]<varu32 -> models>
+0x03 unk03           true
+0x28 recolour        list[u8]<{u16 from; u16 to}>
+0x3C headModel       varu32 -> models
+0x3D unk3D           varu32

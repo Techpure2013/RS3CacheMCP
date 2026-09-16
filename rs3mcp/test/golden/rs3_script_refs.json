@@ -1,0 +1,95 @@
+{
+ "kinds": [
+  {
+   "distinctIds": 61889,
+   "kind": "varbit",
+   "references": 105554
+  },
+  {
+   "distinctIds": 21098,
+   "kind": "script",
+   "references": 52357
+  },
+  {
+   "distinctIds": 7749,
+   "kind": "varclient",
+   "references": 21144
+  },
+  {
+   "distinctIds": 13270,
+   "kind": "varp",
+   "references": 19188
+  },
+  {
+   "distinctIds": 1174,
+   "kind": "iface",
+   "references": 7886
+  },
+  {
+   "distinctIds": 4687,
+   "kind": "graphic",
+   "references": 6728
+  },
+  {
+   "distinctIds": 2878,
+   "kind": "obj",
+   "references": 3715
+  },
+  {
+   "distinctIds": 1457,
+   "kind": "struct",
+   "references": 2622
+  },
+  {
+   "distinctIds": 144,
+   "kind": "inv",
+   "references": 1069
+  },
+  {
+   "distinctIds": 512,
+   "kind": "dbrow",
+   "references": 1028
+  },
+  {
+   "distinctIds": 29,
+   "kind": "stat",
+   "references": 693
+  },
+  {
+   "distinctIds": 602,
+   "kind": "model",
+   "references": 672
+  },
+  {
+   "distinctIds": 260,
+   "kind": "seq",
+   "references": 367
+  },
+  {
+   "distinctIds": 165,
+   "kind": "npc",
+   "references": 195
+  },
+  {
+   "distinctIds": 92,
+   "kind": "quest",
+   "references": 115
+  },
+  {
+   "distinctIds": 69,
+   "kind": "achievement",
+   "references": 104
+  },
+  {
+   "distinctIds": 20,
+   "kind": "cursor",
+   "references": 74
+  },
+  {
+   "distinctIds": 1,
+   "kind": "loc",
+   "references": 1
+  }
+ ],
+ "note": "pass kind= and id=, for instance kind=varbit id=44763. The ids are the ones the decompiler wrote, so a varbit id here is the positive form rather than the negative one the varbit table uses."
+}

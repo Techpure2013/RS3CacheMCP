@@ -1,0 +1,102 @@
+# objects, the locs: every opcode today's cache uses.
+# unkXX is a field we can read and cannot name yet.
+
+type objects
+index 16
+
+0x01 models          list[u8]<{u8 shape; list[u8]<varu32 -> models> models}>
+0x02 name            string
+0x0E width           u8
+0x0F length          u8
+0x11 passable        true
+0x12 seeThrough      true
+0x13 interactable    u8
+0x15 followsGround   true
+0x16 nonFlatShading  true
+0x17 clipped         true
+0x18 animation       varu32 -> sequences
+0x1B unk1B           true
+0x1C decorOffset     u8
+0x1D ambient         i8
+0x1E option1         string
+0x1F option2         string
+0x20 option3         string
+0x21 option4         string
+0x22 option5         string
+0x27 contrast        i8
+0x28 recolour        list<{u16 from; u16 to}>
+0x29 retexture       list<{u16 from -> materials; u16 to -> materials}>
+0x2C recolourSlot    u16
+0x2D retextureSlot   u16
+0x3E mirror          true
+0x40 noShadow        true
+0x41 scaleX          u16
+0x42 scaleY          u16
+0x43 scaleZ          u16
+0x45 blockSides      u8
+0x46 offsetX         i16
+0x47 offsetY         i16
+0x48 offsetZ         i16
+0x49 obstructsGround true
+0x4A hollow          true
+0x4B supportsItems   u8
+0x4E sound           {u16 id; u8 range}
+0x4F randomSounds    {u16 min; u16 max; u8 range; list[u8]<u16> ids}
+0x51 groundContour   u8
+0x52 unk52           true
+0x58 unk58           true
+0x59 unk59           true
+0x5B members         true
+0x5D unk5D           {i8 a; i8 b}
+0x5E unk5E           true
+0x5F unk5F           i16
+0x61 unk61           true
+0x62 unk62           true
+0x66 mapscene        u16 -> mapscenes
+0x67 unk67           true
+0x68 unk68           u8
+0x6A headModels      list<{varu32 model -> models; u8 unk}>
+0x6B mapFunction     u16
+0x6C unk6C           true
+0x6D unk6D           true
+0x6E unk6E           true
+0x6F unk6F           true
+0x96 memberOption1   string
+0x97 memberOption2   string
+0x98 memberOption3   string
+0x99 memberOption4   string
+0x9A memberOption5   string
+0xA0 quests          list<u16 -> quests>
+0xA2 unkA2           i32
+0xA3 unkA3           {i8 a; i8 b; i8 c; i8 d}
+0xA4 unkA4           i16
+0xA5 unkA5           i16
+0xA6 unkA6           u16
+0xA7 unkA7           u16
+0xAA unkAA           varu16
+0xAB unkAB           varu16
+0xAD unkAD           {u16 a; u16 b}
+0xB1 unkB1           true
+0xB2 unkB2           u8
+0xBA unkBA           u8
+0xBC unkBC           true
+0xBD unkBD           true
+0xBE cursor1         u16
+0xBF cursor2         u16
+0xC0 cursor3         u16
+0xC1 cursor4         u16
+0xC2 cursor5         u16
+0xC4 unkC4           u8
+0xC5 unkC5           u8
+0xC6 unkC6           true
+0xC7 unkC7           true
+0xC9 unkC9           {vari16 a; vari16 b; vari16 c; vari16 d; vari16 e; vari16 f}
+0xCA unkCA           u8
+0xCB unkCB           true
+0xCC unkCC           list[u8]<bytes[27]>
+0xCE unkCE           list[u16]<u8>
+0xCF morphs          {u8 _flags; u32 var -> vars; list[varu16]<varu32 -> objects> ids; varu32 fallback -> objects}
+0xD0 morphsWide      {u8 _flags; u32 var -> vars; varu32 fallback -> objects; list[varu16]<varu32 -> objects> ids; varu32 unk -> objects}
+0xD1 modelMorphs     {u16 _size; u8 unk; u32 var -> vars; u8 flags; list[u8]<{u8 value; list[u8]<{u16 a; u16 b; varu32 model -> models}> models}> sets; u16 fallback}
+#                    flags is 2 on all 32 that carry it. The other bits add blocks we have never seen
+0xF9 params          params

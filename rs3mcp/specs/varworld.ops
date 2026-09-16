@@ -1,0 +1,7 @@
+# varworld: world vars. Config page 63. type is the script type a clientscript reads the var as.
+
+type varworld
+index 2
+group 63
+
+0x03 type            u8
