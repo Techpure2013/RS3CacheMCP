@@ -71,7 +71,9 @@ index 18
 # The morph tables since the 2026-09-09 update, read off the bytes. var is the varbit or varp that
 # picks the appearance; fallback is shown when it reads past the list.
 0xBB morphs          {u8 _flags; u32 var -> vars; list[varu16]<u16 -> npcs> ids; u16 fallback -> npcs}
-0xBC morphsWide      {u8 _flags; u32 var -> vars; varu32 fallback -> npcs; list[varu16]<varu32 -> npcs> ids; varu32 unk -> npcs}
+# The npc ids in 0xBC are plain u16: since the 2026-10-12 update npcs past 32767 (31310, 32855) are
+# written as two bytes with the top bit set, which varu32 misread as four.
+0xBC morphsWide      {u8 _flags; u32 var -> vars; u16 fallback -> npcs; list[varu16]<u16 -> npcs> ids; u16 unk -> npcs}
 # A sized block: two bytes of length, then that many. Reading its inside as fixed groups plus the
 # params after it broke 35 records; the params are 0xF9, a separate opcode, and the groups vary.
 0xBD unkBD           {u16 _size; bytes[_size] body}
