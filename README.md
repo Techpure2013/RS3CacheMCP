@@ -103,12 +103,12 @@ running `rs3 setup`, setup copies them into your app's config.
 
 ## For developers
 
-rs3cache runs from `Desktop\rs3cache`. This folder is the copy kept in the repo, and `sync.py` keeps
-the two matching:
+rs3cache runs from a working copy in an `rs3cache` folder beside this repo (or wherever
+`RS3CACHE_LIVE` says). This repo is the copy kept on GitHub, and `sync.py` keeps the two matching:
 
-    python cache-tools/sync.py          shows what's different
-    python cache-tools/sync.py --pull   copies the working copy in here
-    python cache-tools/sync.py --push   copies this back to the working copy
+    python sync.py          shows what's different
+    python sync.py --pull   copies the working copy in here
+    python sync.py --push   copies this back to the working copy
 
 To test, run `python rs3-mcp.py --selftest`. Tests that need something you don't have are skipped,
 and it tells you which.

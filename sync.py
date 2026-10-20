@@ -1,9 +1,9 @@
 """
 Keep the cache tooling in this repo, and say when a copy has drifted.
 
-    python cache-tools/sync.py            what differs, in either direction
-    python cache-tools/sync.py --pull     take the working copy into the repo
-    python cache-tools/sync.py --push     put the repo copy back where it runs from
+    python sync.py            what differs, in either direction
+    python sync.py --pull     take the working copy into the repo
+    python sync.py --push     put the repo copy back where it runs from
 
 The tooling (the mcp server, the database builder, the rebuild pipeline) runs from the desktop
 because that is where the mcp is registered. This holds the copy of record.
