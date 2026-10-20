@@ -6,7 +6,7 @@ it, what reads it, and what the value means. Same for interface behaviour and qu
 
 Indexed by token, which reversed an earlier decision. The argument against was that the
 corpus scans in about a second, and that holds for a warm cache and a pattern that matches
-early. A pattern matching nothing reads all 21,099 files, and under a cold cache one took
+early. A pattern matching nothing reads all 21,102 files, and under a cold cache one took
 123 seconds during a soak.
 
 The index holds every identifier token. A pattern made only of identifier characters must
@@ -25,7 +25,8 @@ import re
 
 from .common import CLIENTSCRIPT
 
-HEADER = re.compile(r"^//\[([^\]]*)\]")
+# //? is a name scriptnames.py could not check
+HEADER = re.compile(r"^//(\?)?\[([^\]]*)\]")
 NUM = re.compile(r"clientscript-(\d+)\.ts$")
 
 _FILES = {"list": None}
@@ -37,7 +38,7 @@ def _files():
             _FILES["list"] = []
         else:
             names = [n for n in os.listdir(CLIENTSCRIPT) if n.endswith(".ts")]
-            # numeric order, so results read in script id order rather than 1, 10, 100
+            # numeric order, so results read by script id
             names.sort(key=lambda n: int(NUM.search(n).group(1)) if NUM.search(n) else 1 << 30)
             _FILES["list"] = names
     return _FILES["list"]
@@ -50,19 +51,17 @@ def _sid(name):
 
 def _tag(text):
     h = HEADER.match(text)
-    return h.group(1) if h else None
+    if not h:
+        return None
+    return h.group(2) + (" (unchecked)" if h.group(1) else "")
 
 
 _IDX = {}
-# Only a pattern made entirely of identifier characters can be answered from a token
-# index. Any occurrence of one must lie inside a token, so a token containing it is a
-# complete list of the files that can match. A pattern with punctuation or a space can
-# straddle a boundary and has to be scanned for.
+# only an identifier pattern answers from the index
 IDENT_ONLY = re.compile(r"^[A-Za-z0-9_]{3,}$")
-# alternation, an inline flag, a wildcard run or an escape class
+# alternation, an inline flag, a wildcard or escape
 LOOKS_REGEX = re.compile(r"\||\(\?|\.\*|\.\+|\\[bdswBDSW]")
-# a pattern that is really asking "what touches this id", which the reference
-# index answers without opening anything
+# a pattern asking what touches this id
 _REFERENCE_SHAPE = re.compile(
     r"\b(comp|varbitplayer|varplayer|varclient)[\(_]\s*(\d+)")
 
@@ -85,7 +84,7 @@ def _runs(pattern):
 def _candidates(pattern, regex):
     """Which files can possibly match, or None meaning look at all of them.
 
-    Substring of a token, not a whole one: SETHIDE has to find IF_SETHIDE. Scanning 124,451
+    Substring of a token, not a whole one: SETHIDE has to find IF_SETHIDE. Scanning 126,287
     short tokens is 30ms against reading 22MB. A pattern with punctuation narrows by its longest
     identifier, so the result stays a superset and is searched properly after.
     """
@@ -116,8 +115,7 @@ def tool_script(args):
         raise ValueError("give a pattern to search for")
     name = str(args.get("name") or "").strip().lower()
     limit = min(int(args.get("limit", 20)), 100)
-    # Collect past the window so a later page can be sliced off. The scan walks the files in
-    # sorted order, so page two is the same hits page one stopped before.
+    # collect past the window, so pages slice off
     start = max(0, int(args.get("start") or 0))
     ceiling = start + limit
     context = min(int(args.get("context", 2)), 10)
@@ -128,14 +126,12 @@ def tool_script(args):
     except re.error as e:
         raise ValueError("bad regex: %s" % e)
 
-    # the cheap test first: most files are thrown out on a raw byte check without being decoded,
-    # which is what makes scanning the whole corpus per request affordable
+    # the cheap byte test first, before decoding
     quick = None
     if not regex:
         quick = pattern.lower().encode("utf-8", "replace")
 
-    # `a|b` or `(?i)x` without regex=true is searched as those exact characters, finds nothing,
-    # and reads as "not in the corpus". Said plainly, since that answer gets believed.
+    # a regex without regex=true finds nothing, said plainly
     literal = None
     if not regex and LOOKS_REGEX.search(pattern):
         literal = ("the pattern was searched as literal text, and it looks like a regex; pass "
@@ -190,9 +186,7 @@ def tool_script(args):
     notes = [literal] if literal and not hits else []
     if len(hits) >= ceiling:
         notes.append("more hits exist; pass start=%d for the next %d" % (ceiling, limit))
-    # A typed reference is a question rs3_script_refs answers from an index rather than by
-    # reading files. `comp(1786,` scans 7,256 of them here and is a keyed lookup there, because
-    # the decompiler wrote the type alongside the number.
+    # a typed reference is a keyed lookup instead
     ref = _REFERENCE_SHAPE.search(pattern)
     if ref:
         kind = {"comp": "iface", "varbitplayer": "varbit",
@@ -245,7 +239,7 @@ def tool_script_read(args):
 
 TOOLS = [
     {"name": "rs3_script", "fn": tool_script,
-     "description": "Search the 21,098 decompiled clientscripts for a pattern, with surrounding "
+     "description": "Search the 21,101 decompiled clientscripts for a pattern, with surrounding "
                     "lines. These settle what the cache cannot: what writes a varbit, what reads "
                     "it, what a value means. About a second. rs3_script_read takes the id this "
                     "returns; rs3_script_refs goes the other way, from a varbit or item id.",

@@ -1,4 +1,4 @@
-"""Read the game cache. No rsmv.
+"""Read the game cache.
 
 Each index is a sqlite db, js5-<major>.jcache. Two tables: `cache` holds a group per row,
 `cache_index` describes them. Payload is `ZLB` 01, uncompressed length, then zlib.
@@ -20,8 +20,15 @@ import sqlite3
 import struct
 import zlib
 
-# where the launcher keeps the cache; RS3MCP_GAME_CACHE for an install somewhere else
+# where the launcher keeps the cache
 GAME = os.environ.get("RS3MCP_GAME_CACHE") or "C:/ProgramData/Jagex/RuneScape"
+
+
+def builds():
+    """The live and beta caches beside GAME that are on disk. The beta client keeps its own,
+    RuneScape-BETA, with opcodes the live one does not use, so the specs are checked on both."""
+    base = re.sub(r"-BETA[\\/]*$", "", GAME.rstrip("\\/"))
+    return [p for p in (base, base + "-BETA") if os.path.exists(os.path.join(p, "js5-22.jcache"))]
 
 # The container: magic, uncompressed length, zlib.
 MAGIC = b"ZLB\x01"
@@ -79,8 +86,7 @@ def unwrap(blob):
         except zlib.error:
             return None
         return out if len(out) == want else None
-    # the js5 container: a compression type, the stored length, and for all but none the
-    # uncompressed length. Models are lzma
+    # the js5 container: compression, length, uncompressed length
     kind, size = blob[0], struct.unpack_from(">I", blob, 1)[0]
     if kind == 0:
         return bytes(blob[5:5 + size])
@@ -88,7 +94,7 @@ def unwrap(blob):
     body = blob[9:9 + size]
     try:
         if kind == 3:
-            # raw lzma after five bytes of properties; the alone format wants the length between
+            # raw lzma after five property bytes
             out = lzma.decompress(bytes(body[:5]) + struct.pack("<Q", want) + bytes(body[5:]),
                                   format=lzma.FORMAT_ALONE)
         elif kind == 2:
@@ -129,10 +135,14 @@ def _open(root, major):
     return con
 
 
+_DESCRIPTORS = {}
+
+
 def descriptor(major, root=GAME):
     """What groups this index holds, and the files in each.
 
-    File ids are sparse, so position in the group is not the id.
+    File ids are sparse, so position in the group is not the id. Kept per index until its stored
+    bytes change, since the models index takes most of a second to read. Treat it as read only.
     """
     con = _open(root, major)
     if con is None:
@@ -143,7 +153,16 @@ def descriptor(major, root=GAME):
         return None
     if row is None:
         return None
-    raw = unwrap(row[0])
+    stamp = zlib.crc32(row[0])
+    kept = _DESCRIPTORS.get((root, major))
+    if kept and kept[0] == stamp:
+        return kept[1]
+    got = _descriptor(unwrap(row[0]))
+    _DESCRIPTORS[(root, major)] = (stamp, got)
+    return got
+
+
+def _descriptor(raw):
     if raw is None:
         return None
 
@@ -157,14 +176,12 @@ def descriptor(major, root=GAME):
     sized = bool(flags & 0x4)
     count = r.varuint() if fmt >= 7 else r.u16()
 
-    # Column major from here. Each loop is one whole column.
+    # column major from here, one loop per column
     minors, acc = [], 0
     for _ in range(count):
         acc += r.u16()
         minors.append(acc)
-    # A named index stores a hash of each group's name rather than the name. The hash is worth
-    # keeping: a dictionary of known names turns it back into one, and for clientscripts that is
-    # the difference between script19 and [proc,magic_runecount].
+    # a named index stores a hash, worth keeping
     hashes = [r.u32() for _ in range(count)] if named else [None] * count
     crcs = [r.u32() for _ in range(count)]
     if sized:

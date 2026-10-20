@@ -1,4 +1,4 @@
-"""RS3 sprites, index 8, as png files without rsmv.
+"""RS3 sprites, index 8, as png files.
 
     python -m rs3mcp.sprites <id> [...] [-o folder]    write those sprites' pngs
     python -m rs3mcp.sprites verify [n]                decode every sprite, or the first n
@@ -38,7 +38,7 @@ def _paletted(data, count):
     pal_at = head - (colours - 1) * 3
     if pal_at < 0:
         raise Stop("a palette of %d colours does not fit" % colours)
-    # one lookup table per channel, so a frame's indices become its colours in three translates
+    # one lookup table per channel, three translates
     pal = b"\0\0\0" + data[pal_at:head] + b"\0\0\0" * (256 - colours)
     red, green, blue = pal[0::3], pal[1::3], pal[2::3]
     solid = b"\0" + b"\xff" * 255
@@ -49,7 +49,7 @@ def _paletted(data, count):
         n = w * h
         if at + 1 + n > pal_at:
             raise Stop("frame %d runs into the palette" % f)
-        # an empty frame still has this byte, which rsmv skips
+        # an empty frame still has this byte
         flags = data[at]
         idx = data[at + 1:at + 1 + n]
         at += 1 + n
@@ -60,7 +60,7 @@ def _paletted(data, count):
             alpha = data[at:at + n]
             at += n
         if flags & 1:
-            # stored column by column; row y is every h-th byte starting at y
+            # stored column by column, every h-th byte
             idx = b"".join(idx[y::h] for y in range(h))
             if alpha is not None:
                 alpha = b"".join(alpha[y::h] for y in range(h))
@@ -68,8 +68,7 @@ def _paletted(data, count):
             raise Stop("frame %d uses colour %d of %d" % (f, max(idx), colours))
         px = bytearray(n * 4)
         px[0::4], px[1::4], px[2::4] = idx.translate(red), idx.translate(green), idx.translate(blue)
-        # index 0 is see-through, unless the frame's own alpha says otherwise. rsmv ignores that
-        # alpha and makes it see-through regardless
+        # index 0 is see-through, unless alpha says otherwise
         px[3::4] = alpha if alpha is not None else idx.translate(solid)
         frames.append((xs[f], ys[f], w, h, bytes(px)))
     if at != pal_at:
@@ -89,7 +88,7 @@ def _truecolour(data, count):
         at += n * 3
         alpha = None
         if flags & 1:
-            # rsmv reads this two bytes late, so its pngs have the alpha two pixels out
+            # right after the pixels, not two bytes late
             alpha = data[at:at + n]
             at += n
         if at > len(data) - 2:
@@ -115,8 +114,8 @@ def decode(data):
 
 
 def canvas(width, height, frame):
-    """One frame placed on its canvas, as rgba rows. rsmv wrote the frame alone, so a sprite with
-    an offset comes out bigger here, at the size the game draws it."""
+    """One frame placed on its canvas, as rgba rows. A sprite with an offset comes out at the
+    size the game draws it, not the size of the frame alone."""
     x, y, w, h, px = frame
     if (x, y, w, h) == (0, 0, width, height):
         return px

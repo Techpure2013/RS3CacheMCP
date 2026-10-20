@@ -1,7 +1,7 @@
 """The game's data tables, and the rows in them.
 
-386 tables holding 20,031 rows: currencies, cosmetics, farm paddocks, invention materials.
-Content that is not an item, npc or loc. Before the opcodes were worked out 13,680 were filed under
+387 tables holding 20,129 rows: currencies, cosmetics, farm paddocks, invention materials.
+Content that is not an item, npc or loc. Before the opcodes were worked out 13,777 were filed under
 the wrong table: the table id is a leb128, see rs3mcp/specs/dbrows.ops.
 
 Two things to know.
@@ -13,7 +13,7 @@ Column types stay numbers. Three are settled: 1 boolean, 9 packed interface comp
 The rest are not guessed at. Id spaces here overlap enough that a small column matches items, npcs
 and structs alike.
 
-The 26,535 strings in these rows are reachable from nothing else. text= searches them.
+The 26,677 strings in these rows are reachable from nothing else. text= searches them.
 
   rs3_dbtable   a table's columns and rows, a text search, or a packed dbcolumn split up
 """
@@ -28,18 +28,13 @@ COLUMN_SHIFT = 4
 COLUMN_MASK = 0xFF
 TUPLE_MASK = 0xF
 
-# Only what the data settles. type 1 is 0 or 1 across 16,405 values, type 9 splits into a real
-# component 1,080 of 1,080 where control types manage one per cent, type 36 the decoder reads as a
-# string. Nothing else is decided.
+# only what the data settles, nothing else
 TYPE_NAMES = {1: "boolean", 9: "interface component, packed", 36: "string"}
 
 
-# Tables hidden from a search by default, each with its reason. Not that they are sold: that none
-# is durable game data, and between them they outnumber the tables anybody searches. all=true turns
-# it off.
+# tables hidden from a search, each with reason
 #
-# Read some rows before adding a family. BUFF_SELECT_EVENT_BUFF looks like event machinery by name
-# and holds real buff names. A name is not evidence.
+# read some rows before adding a family
 HIDDEN_FAMILIES = (
     (("TRH", "MTX", "WOF_", "PREMCLUB", "RUNEPASS", "BP3", "MARKETPLACE"), (),
      "monetised: Treasure Hunter, microtransactions, the battle passes and the store"),
@@ -47,8 +42,7 @@ HIDDEN_FAMILIES = (
      "rotating events: EVENT_WEEKEND and WEEKEND_EVENTS, the bonus weekend schedule"),
     (("UITUTORIAL",), (),
      "onboarding: tutorial prose, 1,256 rows of it"),
-    # Found by reading rows: storefront wording through a quarter or more of the text. The first
-    # three got here one a turn as each surfaced.
+    # found by reading rows: storefront wording throughout
     ((), (102, 122, 134, 385),
      "storefronts under a general name: LOOT_TABLE is all Treasure Hunter, "
      "MOBILE_SHOP_FEATURE_INFORMATION and BONDS_PACKAGE are Bond listings, and 385 is unnamed "
@@ -68,7 +62,7 @@ def _is_promo(tid, name):
     return _hidden_reason(tid, name) is not None
 
 
-# Read once and kept. Keyed on the database's mtime so a rebuild drops them.
+# read once and kept, keyed on mtime
 _CACHE = {}
 
 
@@ -154,9 +148,7 @@ def _table(c, tid):
             "declaredColumns": d.get("count")}
 
 
-# 132 tables carry no name in the cache. These were identified by reading rows, marked as ours so
-# nobody takes them for Jagex's. Ones named by the param pointing at them are absent on purpose:
-# _referenced_by derives those live, and a written copy of a derivable is drift.
+# 132 unnamed tables, identified by reading their rows
 IDENTIFIED = {
     35: "invention disassembly material distributions",
     366: "teleport jewellery: name, item id, and the first of its destinations in table 367",
@@ -180,7 +172,7 @@ def _name_of(c, tid):
 def _referenced_by(c, tid, limit=4):
     """Params typed as dbrow whose value is a row of this table, with what owns them.
 
-    The only handle on 114 of the 369 tables with rows: their rows carry no columns, just three
+    The only handle on 114 of the 370 tables with rows: their rows carry no columns, just three
     bytes naming the table. The meaning is in the param name, so objects.AGILITY_OBSTACLE_DBROW is
     what says table 97 is agility obstacles.
 
@@ -190,7 +182,7 @@ def _referenced_by(c, tid, limit=4):
     typed = list(names)
     if not typed:
         return None
-    # Ask param_use directly. Joining back to config to read the table out of json cost 7ms.
+    # ask param_use directly, since the join cost 7ms
     ids = _row_index(c).get(tid, [])
     if not ids:
         return None
@@ -260,16 +252,14 @@ def _scripts_using(rowids, limit=12):
                    "what it does with it."}
 
 
-# Totals a weighted table adds up to. Anything else is numbers sitting beside some item ids.
+# totals a weighted table adds up to
 WEIGHT_TOTALS = (100, 128, 256, 1000, 1024, 10000, 65536)
 
-# Exact, which under-counts on purpose. A per cent of slack catches the Prifddinas gem rock at 996
-# and also an escape room lock and a crafting recipe: a per cent of 65536 is 655, room for almost
-# any column. One missed row is the cheaper mistake.
+# exact, which under-counts rows on purpose
 
 
 def _drop_shaped(c, limit, show_all=False):
-    # Same answer until a rebuild, and it costs a walk of every row. Compute once, slice.
+    # same answer until a rebuild, so compute once
     hold = _fresh(c)
     if "drops" not in hold:
         hold["drops"] = _drop_scan(c)
@@ -310,8 +300,7 @@ def _drop_scan(c):
             vals = _cells(col)
             if len(vals) < 2 or len({len(v) for v in vals}) != 1 or len(vals[0]) < 2:
                 continue
-            # by index. One column of small numbers passes both tests and matches itself,
-            # which INVENT_MATERIAL_TABLE did.
+            # by index: small numbers pass both tests
             ids = [i for i, v in enumerate(vals)
                    if all(isinstance(x, int) and x in items for x in v)]
             wts = [i for i, v in enumerate(vals)
@@ -326,8 +315,7 @@ def _drop_scan(c):
                                          "example": None})
                 e["rows"] += 1
                 if e["example"] is None:
-                    # Item ids 1 to 20 exist, so category indexes pass the id test too. Say
-                    # which it looks like.
+                    # ids 1 to 20 exist, so say which
                     small = max(ids[0]) < 256
                     e["example"] = {"row": rid, "column": col.get("id"),
                                     "items": ids[0][:6], "weights": wts[-1][:6],
@@ -376,8 +364,7 @@ def tool_dbtable(args):
         needle = str(text).strip()
         low = needle.lower()
         hits = []
-        # LIKE narrows before any json is parsed. No index on a leading wildcard, but the
-        # rejecting happens in C instead of over 20,031 blobs in python.
+        # LIKE narrows before any json is parsed
         show_all = str(args.get("all", "")).lower() in ("1", "true", "yes")
         skipped = {}
         for rid, data in c.execute("select id, data from config where type='dbrows' "
@@ -399,8 +386,7 @@ def tool_dbtable(args):
                             break
             if len(hits) >= limit:
                 break
-        # One row can match in several columns, so the loop steps past the limit before it
-        # checks. Cut here.
+        # one row can match in several columns
         hits = hits[:limit]
         return {"found": len(hits), "rows": hits,
                 "hidden": (None if not skipped else
@@ -473,13 +459,10 @@ TOOLS = [
          "name": {"type": "string", "description": "table name, exact or partial"},
          "search": {"type": "string", "description": "list tables whose name contains this"},
          "rows": {"type": "string", "description": "true to include the table's rows"},
-         "column": {"type": "string", "description": "a packed dbcolumn id, split into table and "
-                                                     "column"},
+         "column": {"type": "string", "description": "a packed dbcolumn id to split"},
          "text": {"type": "string", "description": "find rows whose stored text contains this"},
-         "drops": {"type": "string", "description": "true to list tables holding weighted drop "
-                                                    "tables, found by shape rather than name"},
-         "all": {"type": "string", "description": "true to include the tables hidden by default "
-                                                  "from drops= and text=: monetised content, the "
-                                                  "rotating event schedule and tutorial prose"},
+         "drops": {"type": "string", "description": "true to list weighted drop tables, found by shape"},
+         "all": {"type": "string", "description": "true to include what drops= and text= hide: "
+                                                  "monetised, event schedule, tutorial prose"},
          "limit": {"type": "integer", "description": "max tables or rows, default 40"}}}},
 ]

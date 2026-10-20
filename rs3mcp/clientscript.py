@@ -22,13 +22,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from rs3mcp import cachefile  # noqa: E402
+from rs3mcp import cachefile, common  # noqa: E402
 
 MAJOR = 12
-OPMAP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "opcodes", "clientscript-opmap.json")
+SHIPPED_OPMAP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "opcodes", "clientscript-opmap.json")
+# its own map in its own data folder
+OPMAP = os.path.join(common.ROOT, "clientscript-opmap.json") if common.OWN_ROOT else SHIPPED_OPMAP
 NAMES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "opcodes", "clientscript-opnames.json")
 
-# immediate kinds, and the const kinds a push carries in its first byte
+# immediate kinds, and what a push carries
 IMM = ("byte", "int", "tribyte", "const")
 CONST = {0: "int", 1: "long", 2: "string"}
 

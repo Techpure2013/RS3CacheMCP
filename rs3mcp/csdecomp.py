@@ -42,7 +42,7 @@ VAR_NAMES = {0: "varplayer", 1: "varnpc", 2: "varclient", 3: "varworld", 4: "var
 ATOM = 100
 END = -1
 BUMP = re.compile(r"(\w+) = \1 \+ 1;")
-# ops whose types come from the data they name, never from a vote on the op
+# ops typed by the data they name
 DYNAMIC = st.GETPARAM | {OP["enum"], OP["db_getfield"], OP["db_find"], OP["db_find_with_count"],
                          OP["db_find_733"]}
 
@@ -53,11 +53,11 @@ class Expr:
     def __init__(self, text, prec=ATOM, value=None, cmp=None, typ=None, slot=None):
         self.text = text
         self.prec = prec
-        # the constant this is, when it is one: enum and hooks read their types from it
+        # the constant this is, when it is one
         self.value = value
-        # (left, symbol, right) when this is a comparison, so a not can flip it
+        # (left, symbol, right) when this is a comparison
         self.cmp = cmp
-        # the script type it is known to have, and the slot it came out of, for votes
+        # the script type it has, and its slot
         self.type = typ
         self.slot = slot
 
@@ -67,7 +67,7 @@ class Expr:
 
 def binary(a, sym, b):
     p = PREC[sym]
-    # left associative: the right side needs brackets at equal precedence
+    # left associative: equal precedence needs brackets right
     cmp = (a, sym, b) if sym in NEGATE else None
     return Expr("%s %s %s" % (a.at(p), sym, b.at(p + 1)), p, cmp=cmp)
 
@@ -116,12 +116,12 @@ class Script:
         self.args = {I: self.head["argInts"], S: self.head["argStrings"], L: self.head["argLongs"]}
         self.used_locals = set()
         self.tmp = 0
-        # loops being laid out right now, so a switch inside one cannot open it again
+        # loops being laid out right now
         self.active = set()
-        # blocks already laid out, so a region can pick up what no path of its own reached
+        # blocks already laid out, for unreached regions
         self.laid = set()
         self.depth = 0
-        # write a short return reached from several places at each place; a retry for gotos
+        # a short return written at each place
         self.inline_returns = False
 
     # blocks
@@ -172,7 +172,7 @@ class Script:
                         break
                 else:
                     raise st.Wrong("empty %s stack" % kind)
-            # arguments read in the order they were pushed, whichever stack each is on
+            # arguments read in the order they were pushed
             got.sort(key=lambda e: e[2])
             return [(e[0], e[1]) for e in got]
 
@@ -182,8 +182,7 @@ class Script:
         def into(slot, e, t=None):
             """e flows into slot, whose type is t or whatever the slot has settled on."""
             t = t if t is not None else votes.get(slot)
-            # the type e had coming in: after the sink a constant carries the slot's own type,
-            # and voting that back would keep a wrong guess forever
+            # the type e had coming in
             had = e.type
             sink(e, t)
             votes.vote(slot, had)
@@ -212,7 +211,7 @@ class Script:
                 name = self.local(kind, imm)
                 ints = [j for j, e in enumerate(stack) if e[0] == I]
                 if i - 4 >= start and st._postfix(self.code, i) and ints and stack[ints[-1]][1].text == name:
-                    # x++ as an argument: the old x is still waiting on the stack
+                    # x++ as an argument, old x still waiting
                     j = ints[-1]
                     old = stack[j][1]
                     step = "++" if cs.names().get(self.code[i - 1][0]) == "ADD" else "--"
@@ -360,7 +359,7 @@ class Script:
 
     @staticmethod
     def gather(out):
-        # a tmp is read once, so stores of every one of them straight after the call are all of it
+        # a tmp is read once, so stores follow
         res, i = [], 0
         while i < len(out):
             s = out[i]
@@ -399,7 +398,7 @@ class Script:
         elif len(pushes) == 1:
             push(pushes[0], result(call.text, 0))
         else:
-            # several values at once: name each, so the uses below read them in order
+            # several values at once, named in order
             names = ["tmp%d" % (self.tmp + k) for k in range(len(pushes))]
             self.tmp += len(pushes)
             out.append("[%s] = %s;" % (", ".join(names), call.text))
@@ -501,7 +500,7 @@ class Script:
         changed = True
         while changed:
             changed = False
-            # a merge takes edges away, so how many ways lead into each block is counted afresh
+            # a merge takes edges away, so recount them
             counts = collections.Counter()
             for b in self.reach:
                 if b in self.forward or b in self.merged:
@@ -565,8 +564,7 @@ class Script:
         cur = self.follow(start)
         while True:
             if cur is None or cur == END or not (start <= cur < end) or cur in self.laid:
-                # this path is over; anything later in the range nobody laid out is still ours,
-                # reached by a goto from somewhere
+                # this path is over, later blocks still ours
                 cur = self.unlaid(start, end)
                 if cur is None:
                     break
@@ -593,7 +591,7 @@ class Script:
         if exit_ == END or exit_ in natural:
             return None
         if exit_ >= end or exit_ <= head:
-            # leaving the loop may still be a break or continue of what is around it
+            # leaving the loop may break or continue outside
             return self.jump(exit_, head, end, loop_outer, out, natural)
         return exit_
 
@@ -617,7 +615,7 @@ class Script:
             if t == loop[2]:
                 out.append(("break",))
                 return None
-            # a continue reaches through any switches to the loop around them
+            # a continue reaches through switches to its loop
             outer = loop[4]
             while outer is not None and loop[3] == "switch":
                 if outer[3] == "loop":
@@ -632,7 +630,7 @@ class Script:
 
     def goto(self, t, out):
         if t != END and t in self.blocks and self.blocks[t][1][0] == "return" and len(self.blocks[t][0]) <= 2:
-            # a jump to a short block that returns reads better as that block written again
+            # a jump to a short returning block
             out.append(("goto", t, self.blocks[t][0] + [self.return_text(self.blocks[t][1][1])]))
             return None
         self.gotos += 1
@@ -692,8 +690,7 @@ class Script:
                     return self.jump(other, cur, end, loop, out, natural) if leaves(other) else other
                 join = self.shared_step(target)
                 if join is not None and cur < other < join <= end and (join == end or join not in natural):
-                    # a short shared block that jumps on: written on this side, and the other side
-                    # laid out up to where it jumps
+                    # a short shared block that jumps on
                     self.laid.add(target)
                     other_nodes = self.region(other, join, loop, natural={join})
                     out.append(("if", cur, c if is_t else negate(c), is_t,
@@ -714,12 +711,11 @@ class Script:
         test = c if is_t else negate(c)
 
         def after(target):
-            # what reaching target means inside a branch whose if leaves for target
+            # what reaching target means inside a branch
             return {target} | (natural if target in natural else set())
 
         if leaves(far):
-            # the other side leaves this region: lay the taken side out to the end, where a
-            # jump to the same place counts as its end, and write the leaving jump once after
+            # the other side leaves, so write it after
             then = self.region(near, end, loop, natural=after(far))
             out.append(("if", cur, test, is_t, then, None))
             return self.jump(far, cur, end, loop, out, natural)
@@ -737,21 +733,20 @@ class Script:
                     tail = self.last_block(far, end)
                     tterm = self.blocks[tail][1] if tail is not None else None
                     if tterm is not None and tterm[0] == "goto" and self.follow(tterm[1]) == jt:
-                        # both sides leave for the same place: if/else, then that jump once
+                        # both sides leave the same way: if/else
                         then = self.region(near, far, loop, natural=after(jt))
                         other = self.region(far, end, loop, natural=after(jt))
                         out.append(("if", cur, test, is_t, then, other))
                         return self.jump(jt, cur, end, loop, out, natural)
                     if jt in natural:
-                        # the taken side ends where this region does, so the rest is its else
+                        # the taken side ends here, rest is else
                         then = self.region(near, far, loop, natural=after(jt))
                         other = self.region(far, end, loop, natural=natural)
                         out.append(("if", cur, test, is_t, then, other))
                         return None
         if else_end is None and (last is None or self.blocks[last][1][0] != "goto"
                                  or self.follow(self.blocks[last][1][1]) <= last):
-            # the taken side ends in a loop, so its last block jumps back: where it leaves from is
-            # wherever its jumps out of the range go, when that is one place past the other side
+            # the taken side ends in a loop
             outs = set()
             for blk in self.order:
                 if near <= blk < far and blk in self.reach and blk not in self.merged \
@@ -779,15 +774,14 @@ class Script:
         for val, tgt in sorted(table.items()):
             by_target[self.follow(tgt)].append(val)
         starts = sorted(s for s in by_target if s != END and cur < s < end)
-        # a match that goes straight out of this region has no code of its own here
+        # a match straight out has no code here
         away = sorted(s for s in by_target if s != END and s not in starts)
-        # where the cases meet again: where most of them jump to at their end
+        # where the cases meet again, by vote
         ends = collections.Counter(s for s in away if s > cur)
-        # default code of its own votes too, as it may sit before the cases
+        # default code votes too, sitting before the cases
         own = [default] if default != END and default not in by_target and cur < default < end else []
         for s in starts + own:
-            # a case runs to the next case, or to the default code when that comes first, and
-            # every place past it that it jumps to is a vote for where the cases meet
+            # a case runs to the next one
             bound = min([x for x in starts + [default] if x != END and x > s] + [end])
             outs = set()
             for blk in self.order:
@@ -797,8 +791,7 @@ class Script:
             for j in outs:
                 ends[j] += 1
         if not ends and starts and default != END and cur < default and default > max(starts):
-            # no case ends in a jump and no match goes past every case: that is where the switch
-            # ends, unless the cases jump further still, past it, in which case it is default code
+            # no case ends in a jump
             past = collections.Counter()
             for blk in self.order:
                 if starts[0] <= blk < default and blk in self.reach and blk not in self.merged \
@@ -807,12 +800,11 @@ class Script:
                         if x != END and x > default:
                             past[x] += 1
             ends[min(past, key=lambda x: (-past[x], x)) if past else default] += 1
-        # nothing in the switch goes on past its own code, so nothing after it is reached from it
-        # and no jump is written after it
+        # nothing in the switch goes on past it
         never = not ends
         meet = min(ends, key=lambda x: (-ends[x], x)) if ends else end
         follow = end if meet == END else min(meet, end)
-        # the default is code of its own when no match lands anywhere but where cases meet
+        # the default is code of its own
         has_default = default not in (meet, END) and default not in by_target and cur < default < follow
         regions = sorted(starts + ([default] if has_default else []))
         bounds = regions + [follow]
@@ -827,13 +819,13 @@ class Script:
             cases.append((by_target[s], leave))
             regions = regions + [s]
         if default not in by_target and not has_default and default != meet:
-            # no match leaves the switch for somewhere else: say so in a default
+            # no match leaves the switch elsewhere
             leave = []
             self.jump(default, cur, follow, inner, leave, {follow} if meet == follow else set())
             cases.append((None, leave))
             regions = regions + [None]
         if default in by_target:
-            # no match runs the same code as a case
+            # no match runs a case's own code
             cases = [(vals + ["default"] if vals is not None and s == default else vals, body)
                      for (vals, body), s in zip(cases, regions)]
         out.append(("switch", cur, v, cases, None, END in by_target))
@@ -845,12 +837,12 @@ class Script:
 
     def loop(self, head, out, end, natural, outer):
         latch = self.loops[head]
-        # the jump back can sit in an empty block past the latch, with code between them
+        # the jump back can sit past the latch
         tail = max([latch] + [f for f in self.forward if f > latch and f in self.reach
                               and self.follow(f) == head])
         body_end = self.next_after(tail)
         stmts, term = self.blocks[head]
-        # the exit is the nearest place past the loop that something inside it jumps to
+        # the exit is the nearest place ahead
         outside = set()
         for blk in self.order:
             if head <= blk < body_end and blk in self.reach and blk not in self.merged \
@@ -860,10 +852,10 @@ class Script:
                     if x == END or x >= body_end or x < head:
                         outside.add(x)
         ahead = [x for x in outside if x != END and x >= body_end]
-        # with nowhere ahead to go, a jump back to an outer loop's head is the way out
+        # a jump back out is the way out
         back = [x for x in outside if x != END and x < head]
         exit_ = min(ahead) if ahead else max(back) if back else END if outside else body_end
-        # a header of nothing but `x = x + 1` reads as ++x inside the condition
+        # a header of one increment reads as ++x
         bump = BUMP.fullmatch(stmts[0]) if len(stmts) == 1 else None
         plain = term[0] == "cond" and (not stmts or bump is not None)
         if plain:
@@ -962,7 +954,7 @@ class Script:
                     table = {}
                     default_in = a
                     for n, (values, body) in enumerate(node[3]):
-                        # falling off a case runs on into the next one
+                        # falling off a case runs into the next
                         rest = [b for _, b in node[3][n + 1:]]
                         after_case = a
                         for later in reversed(rest):
@@ -982,10 +974,10 @@ class Script:
                 elif k == "return":
                     got[node[1]] = ("return",)
                 elif k == "goto" and len(node) > 2:
-                    # a short returning block written out where it is jumped to: that is the block
+                    # a short returning block written where jumped to
                     got[node[1]] = ("return",)
                 elif k == "inline":
-                    # a short block written out on one side: each copy has to go where it jumps
+                    # a short block written out on one side
                     have = ("goto", nxt())
                     if got.get(node[1], have) != have:
                         problems.append("block %d is written out going to two places" % node[1])
@@ -1023,7 +1015,7 @@ class Script:
             lines.append("    let %s;" % ", ".join(
                 "%s%d: %s" % ({I: "int", S: "string", L: "long"}[k], n, self.typename(k, n)) for k, n in order))
         if self.problems:
-            # the structured layout did not check out, so write every jump as it is: always right
+            # the structured layout failed, so write every jump
             lines.append("    // flat: the structured layout did not match the jumps (%s)" % self.problems[0])
             self.flat(lines)
         else:
@@ -1122,9 +1114,9 @@ def context(rounds=8):
     ctx = st.Context()
     raw = json.load(open(cs.OPMAP, encoding="utf-8"))["ops"]
     ctx.opmap_kinds = {v["op"]: v["imm"] for v in raw.values()}
-    # infer settles every script and votes returns for the ones simulation cannot
+    # infer settles every script and votes returns
     st.infer(ctx)
-    # names come as hashes in the script index; the known ones turn back into [proc,name]
+    # names come as hashes in the script index
     known = json.load(open(os.path.join(os.path.dirname(cs.NAMES), "rs-name-hashes.json"), encoding="utf-8"))
     desc = cs.cachefile.descriptor(cs.MAJOR) or {}
     ctx.script_names = {sid: known[str(g["nameHash"])] for sid, g in desc.items()
@@ -1133,7 +1125,7 @@ def context(rounds=8):
     ctx.votes = ty.Votes()
     ty.seed(ctx.votes, cs.OPMAP)
     learn(ctx, rounds)
-    # what the ops take and give, kept for the next update to start from
+    # what the ops take and give, kept
     ty.save(ctx.votes)
     return ctx
 
@@ -1163,7 +1155,7 @@ class Workers:
         import pickle
         self.chunks = [[] for _ in range(WORKERS)]
         sizes = [0] * WORKERS
-        # biggest first, each to the lightest chunk, so no worker holds everyone up
+        # biggest first, each to the lightest chunk
         for sid in sorted(ctx.code, key=lambda s: -len(ctx.code[s])):
             k = sizes.index(min(sizes))
             self.chunks[k].append(sid)
@@ -1176,7 +1168,7 @@ class Workers:
         """The pool for this ctx, started once: learning types and writing share it. Pool
         processes end with the program."""
         if id(ctx) not in _POOLS:
-            # ctx is kept too, so its id cannot come back for another
+            # ctx is kept, so its id cannot repeat
             _POOLS[id(ctx)] = (ctx, Workers(ctx))
         return _POOLS[id(ctx)][1]
 
@@ -1233,8 +1225,7 @@ def decompile(ctx, sid, names=None):
     s = Script(ctx, sid, names)
     text = s.text()
     if s.gotos or s.problems:
-        # a short block reached from several places can leave no shape but a goto; written out at
-        # each place it often fits one, and the retry is kept only when it is better and checks out
+        # a short block reached from several places
         again = Script(ctx, sid, names)
         again.inline_returns = True
         retry = again.text()
@@ -1324,7 +1315,7 @@ def listing(ctx, sid, names, why):
 
 
 def declarations(ctx):
-    """Every var a script can name, with its type, as rsmv's clientvars.d.ts laid them out."""
+    """Every var a script can name, with its type, as a TypeScript declaration file."""
     lines = []
     by_domain = collections.defaultdict(list)
     for (dom, vid), t in ctx.vars.items():

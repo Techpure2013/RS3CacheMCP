@@ -38,9 +38,7 @@ SLOW_MS = 1500
 
 STALE_DAYS = 14
 
-# Tools allowed past SLOW_MS, with what they are doing to deserve it. Anything not named here is
-# held to the bar; adding a name is meant to be a decision somebody made, not a threshold nudged up
-# until the run went quiet.
+# tools allowed past SLOW_MS, with their reason
 SLOW_ALLOWANCE = {
     "rs3_drift": (3000, "re-runs all 24 drift checks and the listing budget in one call, which is "
                         "the job rather than a slow query"),
@@ -139,11 +137,11 @@ def main():
     from rs3mcp.families import tool_family
     from rs3mcp.vars import tool_var
     from rs3mcp.iface import tool_iface
-    # every tool the server registers, add-on included, so this never names an add-on module
+    # every tool the server registers, add-on included
     import runpy
     reg = runpy.run_path(os.path.join(ROOT, "rs3-mcp.py"))["BY_NAME"]
 
-    # ---- items, npcs, locs: lookup, trace and family agree on the name
+    # ---- items, npcs, locs: lookup, trace and family agree
     for kind, ctype in (("item", "items"), ("npc", "npcs"), ("loc", "objects")):
         rows = sample(c, ctype, N, rnd)
         print("  %-5s %d ids" % (kind, len(rows)), flush=True)
@@ -159,7 +157,7 @@ def main():
                     fail("agreement", {"kind": kind, "id": cid},
                          "lookup and trace disagree on the name", "%s vs %s" % (a, b))
 
-    # ---- vars: every varbit must resolve, and its base must exist and contain it
+    # ---- vars: every varbit resolves onto an existing base
     vb = rnd.sample(c.execute("select id, name, base_id from varbit order by id").fetchall(),
                     min(N, c.execute("select count(*) from varbit").fetchone()[0]))
     print("  vars  %d varbits" % len(vb), flush=True)
@@ -198,10 +196,10 @@ def main():
                     fail("rs3_iface", {"id": one["packedID"]}, "packed id does not round-trip",
                          str(again.get("at")))
 
-    # item names a person would type, for the add-ons that take names
+    # item names a person would type
     names = [r["display"] for r in sample(c, "items", 60, rnd) if r["display"]]
 
-    # ---- sprites, both ways in, and the png must be where it says it is
+    # ---- sprites both ways in, and the png exists
     from rs3mcp.cache import tool_sprite
     snames = rnd.sample([r[0] for r in c.execute("select name from sprite_name order by name")],
                         min(N, 120))
@@ -227,11 +225,9 @@ def main():
     for pat in pats:
         call(tool_script, "rs3_script", {"pattern": pat, "limit": 5})
 
-    # ---- the tools that take a name or a path rather than an id
+    # ---- the tools taking a name or a path
     #
-    # These were exercised by nobody for months while the run still printed 0 failures over 11 of
-    # 38 tools. They are driven the same way: real inputs drawn from the same sources a person
-    # would type, not a fixed list of things known to work.
+    # driven on real inputs, not a fixed list
     def hit(name, argsets):
         # an add-on's tool, with that add-on not loaded
         if name not in reg:
@@ -240,7 +236,7 @@ def main():
         for a in argsets:
             call(fn, name, a)
 
-    # an add-on soaks its own tools, with the same hit() and the same random picks
+    # an add-on soaks its own tools the same
     from rs3mcp import addons
     for extra in addons.every("soak"):
         extra(hit, fail, rnd, N, names)
@@ -251,13 +247,12 @@ def main():
     print("  dbtab %d tables, with rows and packed columns" % len(pick), flush=True)
     hit("rs3_dbtable", [{"id": str(t)} for t in pick]
         + [{"id": str(t), "rows": "true", "limit": 5} for t in pick[:20]]
-        # a packed column for each, plus a table id sitting where a packed id goes, which is the
-        # shape a caller gets wrong first
+        # a packed column each, plus a table id
         + [{"column": str((t << 12) | (0 << 4))} for t in pick[:20]]
         + [{"column": str(t)} for t in pick[:5]]
         + [{"search": "TABLE"}, {}]
         + [{"text": w} for w in ("Pouch", "Trail", "Currency", "zzzznope")]
-        # key-only tables go down a different branch, so they are soaked explicitly
+        # key-only tables go down a different branch
         + [{"id": "97", "rows": "true"}, {"id": "144", "rows": "true"}]
         + [{"drops": "true"}, {"drops": "true", "all": "true"},
            {"text": "Pouch", "all": "true"}, {"text": "Dragon", "limit": 5}])
@@ -272,9 +267,9 @@ def main():
     hit("rs3_cache_diff", [{"type": t, "limit": 5} for t in ("items","objects","npcs")])
     hit("rs3_script_read", [{"script": str(i)} for i in rnd.sample(range(0, 4000), 20)])
 
-    # A tool nobody soaks is a tool whose failure nobody would see. Anything registered has to be
-    # driven above or named here with a reason.
-    SKIP = {"rs3_wiki": "goes to the network, and the courtesy gap makes a soak antisocial"}
+    # a tool nobody soaks fails where nobody sees
+    SKIP = {"rs3_wiki": "goes to the network, and the courtesy gap makes a soak antisocial",
+        "rs3_research": "would fetch the web at random"}
     for extra in addons.every("soak_skip"):
         SKIP.update(extra)
     missed = sorted(set(reg) - set(STATS) - set(SKIP))

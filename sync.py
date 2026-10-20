@@ -1,20 +1,12 @@
 """
-Keep the cache tooling and the rsmv patches in this repo, and say when a copy has drifted.
+Keep the cache tooling in this repo, and say when a copy has drifted.
 
     python cache-tools/sync.py            what differs, in either direction
     python cache-tools/sync.py --pull     take the working copy into the repo
     python cache-tools/sync.py --push     put the repo copy back where it runs from
 
-Two things live here that would otherwise exist nowhere but one folder on one disk.
-
-The tooling -- the mcp server, the database builder, the rebuild pipeline -- runs from the desktop
+The tooling (the mcp server, the database builder, the rebuild pipeline) runs from the desktop
 because that is where the mcp is registered. This holds the copy of record.
-
-The rsmv patches matter more, because rsmv is a third party checkout with no version control of its
-own: an npm install or a fresh download silently erases every opcode we have worked out. Five files
-carry that work. Two of them, callibrator.ts and subtypedetector.ts, are mostly upstream code with
-a couple of lines of ours, so the whole file is kept rather than a patch that would not apply after
-an upstream change.
 
 Drift is reported both ways on purpose. A file newer in the working copy is work not yet saved; a
 file newer here is work that was saved and then lost. Neither is safe to guess at, so nothing is
@@ -30,11 +22,9 @@ import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)
-DESKTOP = os.path.dirname(REPO)
-RSMV = os.path.join(DESKTOP, "_RS3_Data", "rsmv-master")
-# where the tools run from: the server, its scripts, and data/ beside them
-LIVE = os.path.join(DESKTOP, "rs3cache")
+# where the tools run from: the server, its scripts, and data/ beside them; rs3cache beside this
+# repo unless RS3CACHE_LIVE names it
+LIVE = os.environ.get("RS3CACHE_LIVE") or os.path.join(os.path.dirname(HERE), "rs3cache")
 
 # (path in this repo, path where it actually runs)
 TOOLING = [
@@ -50,20 +40,6 @@ TOOLING = [
     ("model_obj.py", os.path.join(LIVE, "model_obj.py")),
     ("model_png.py", os.path.join(LIVE, "model_png.py")),
 ]
-
-# rsmv files we have changed, and what our change is. The line counts are ours, not the file's.
-RSMV_PATCHES = {
-    "src/opcodes/items.jsonc":
-        "item opcodes: 0x09 as a model array, 0xB6, and the earlier 0xBE-0xC7 stack info",
-    "src/opcodes/objects.jsonc":
-        "loc opcodes: 0x6C, 0x6D and 0x6E as zero-length flags, 0xCE as a counted byte blob",
-    "src/opcodes/achievements.jsonc":
-        "achievement opcodes: 0x1A, and 0x02 rewritten as the counted array it is",
-    "src/clientscript/subtypedetector.ts":
-        "a subtype contradiction keeps the first type instead of aborting the whole run",
-    "src/clientscript/callibrator.ts":
-        "varInfoParser 0x08 and varbitInfoParser 0x10, which is what made varbits readable",
-}
 
 # the shared tools and their documentation. Add-on packages and the scripts that belong to them stay
 # on the live copy; naming one here is all it takes to keep it
@@ -87,9 +63,8 @@ def package_files():
     for dp, dn, fn in (step for walk in walks for step in walk):
         dn[:] = [d for d in dn if d not in SKIP]
         for f in sorted(fn):
-            # Everything the package carries, not only its python. Filtering on .py and .json left
-            # out the node bridge rs3_lua_ast calls, the opcode overlay opdecode reads, and every
-            # test fixture -- a copy of record that could not pass its own tests.
+            # Everything the package carries, not only its python. Filtering on .py and .json once
+            # left out data files and test fixtures, a copy of record that could not pass its tests.
             if not f.endswith((".pyc", ".pyo")):
                 live = os.path.join(dp, f)
                 out.append((os.path.relpath(live, LIVE).replace("\\", "/"), live))
@@ -103,8 +78,6 @@ def pairs():
         out.append((os.path.join(HERE, rel), live, rel))
     for rel, live in package_files():
         out.append((os.path.join(HERE, rel), live, rel))
-    for rel in sorted(RSMV_PATCHES):
-        out.append((os.path.join(HERE, "rsmv", rel), os.path.join(RSMV, rel), "rsmv/" + rel))
     return out
 
 
@@ -198,7 +171,7 @@ def write_manifest():
         d = digest(repo)
         if d:
             rows[label] = d
-    blob = {"files": rows, "rsmvPatches": RSMV_PATCHES,
+    blob = {"files": rows,
             "note": "sha256 of each file as saved here. sync.py compares these against the "
                     "working copies and says which side is newer."}
     with io.open(os.path.join(HERE, "manifest.json"), "w", encoding="utf-8", newline="\n") as fh:

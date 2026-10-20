@@ -1,4 +1,6 @@
 # maplabels: the icons and text the world map places, config page 36.
+# Lines marked beta are the beta client's cache (RuneScape-BETA), checked 2026-09-25. Live's unk byte
+# is 255 on 286 labels; the beta does not carry it.
 
 type maplabels
 index 2
@@ -10,17 +12,20 @@ group 36
 0x04 colour          u24
 0x05 hoverColour     u24
 0x06 fontSize        u8
-0x07 unk07           u8
+0x07 showOnMiniMap   u8                          # 2 or 3; the client shows it for either
 0x08 unk08           u8
+0x09 shownWhen       {u32 var -> vars; i32 min; i32 max} # beta: 0xFA without the unk byte
 0x0A option1         string
 0x0F polygon         {u8 _n; list[_n]<{i16 x; i16 y}> points; u32 fill; list[u8]<u32> colours; list[_n]<u8> perPoint}
 0x11 option2         string
 0x13 category        u16
+0x14 shownWhen2      {u32 var -> vars; i32 min; i32 max} # beta: 0xFB without the unk byte
 0x15 unk15           i32
 0x16 unk16           i32
 0x19 background      varu32 -> sprites
-0x1C unk1C           u8
-0x1E unk1E           u8
+0x1A morphs          {u32 var -> vars; list[u8]<{u16 a; u16 b}> pairs} # beta: 0xFC without the unk byte
+0x1C minimapIconScale u8                         # 50, 75 or 100, the client's exactly on all 1,352; -1 without it
+0x1E alignVertical   u8                          # 2 (BOTTOM) on all 397 carrying it; CENTRE is the unwritten default
 0xF9 params          params
 0xFA shownWhen       {u8 unk; u32 var -> vars; i32 min; i32 max}
 0xFB shownWhen2      {u8 unk; u32 var -> vars; i32 min; i32 max}

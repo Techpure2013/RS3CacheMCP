@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from .common import ROOT
 
 POOL = os.path.join(ROOT, "pool")
-# answers are clipped the way the pool clips a transcript's, so a session log stays small
+# answers are clipped the way the pool clips
 CLIP = 8000
 
 
@@ -68,7 +68,7 @@ class Log:
                                              "content": text, "is_error": bool(error)}]}})
 
     def _line(self, rec):
-        # the log must never break an answer, so a failed write is only a gap on the map
+        # a failed write is only a gap here
         try:
             with io.open(self.path, "a", encoding="utf-8", newline="\n") as fh:
                 fh.write(json.dumps(rec, separators=(",", ":"), default=str) + "\n")

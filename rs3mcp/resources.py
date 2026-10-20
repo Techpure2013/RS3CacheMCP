@@ -68,7 +68,7 @@ STATIC = {
         MD, lambda: tool_text("rs3_schema")),
 }
 
-# (uriTemplate, name, description, mimeType, prefix, handler taking the rest of the uri)
+# (uriTemplate, name, description, mimeType, prefix, handler)
 TEMPLATES = [
     ("rs3://script/{id}", "clientscript",
      "One decompiled clientscript by id. Too many to list, so they are addressed. "
@@ -115,8 +115,7 @@ def read(uri):
     for _t, _n, _d, _m, prefix, handler in _templates():
         if uri.startswith(prefix):
             rest = uri[len(prefix):]
-            # No separators. A uri is not a path, and joining one onto a directory is how a
-            # reader reaches outside it.
+            # no separators: a uri is not a path
             if not rest or "/" in rest or "\\" in rest or ".." in rest:
                 return None
             return handler(rest)

@@ -50,10 +50,6 @@
   },
   {
    "mentions": 1,
-   "script": "clientscript-11997"
-  },
-  {
-   "mentions": 1,
    "script": "clientscript-12002"
   },
   {
@@ -62,15 +58,7 @@
   },
   {
    "mentions": 1,
-   "script": "clientscript-12235"
-  },
-  {
-   "mentions": 1,
    "script": "clientscript-12342"
-  },
-  {
-   "mentions": 1,
-   "script": "clientscript-1237"
   },
   {
    "mentions": 1,
@@ -163,6 +151,18 @@
   {
    "mentions": 1,
    "script": "clientscript-15841"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-15978"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-15979"
+  },
+  {
+   "mentions": 1,
+   "script": "clientscript-16379"
   }
  ]
 }

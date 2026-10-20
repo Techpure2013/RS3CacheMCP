@@ -10,6 +10,16 @@
     rs3 pool                         open the scrying pool in a browser
     rs3 docs                         write docs/tools.md and docs/database.md from the code
 
+Asking the cache:
+
+    rs3 lookup item Coins            one item, npc, loc, enum, struct... with params resolved
+    rs3 var QUEST_OBJECTIVE          a var or varbit: its base, bits and who reads it
+    rs3 sprite necrosis              sprites by name
+    rs3 schema                       the cache's tables (config, inv_stock, varbit, model_use...)
+    rs3 query sql="select ..."       any SELECT over those tables
+
+db_query and config read other sources (questbuddy, a live client), not the cache.
+
 Answers print as text and tables. Add --json to any tool for the raw answer.
 """
 
@@ -26,7 +36,7 @@ import textwrap
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER_FILE = os.path.join(BASE, "rs3-mcp.py")
 
-# words a tool is most often asked about, in the order plain words are handed to them
+# words a tool is most often asked about
 TEXTY = ("name", "q", "query", "pattern", "search", "text", "sql", "script", "symbol", "component",
          "path", "var", "id")
 
@@ -111,11 +121,14 @@ def parse(tool, words):
     texty = [k for k in TEXTY if k in props and k not in args and k not in slots]
     while loose and slots:
         k = slots.pop(0)
-        # the last required one takes the rest, unless it is a kind and a name can take them
+        # the last required one takes the rest
         if not slots and (k in TEXTY or not texty):
             args[k], loose = " ".join(loose), []
         else:
             args[k] = loose.pop(0)
+    # rs3 config npc 81 names the kind first
+    if loose and "type" in props and "type" not in args and not loose[0].lstrip("-").isdigit():
+        args["type"] = loose.pop(0)
     if loose:
         if len(loose) == 1 and loose[0].lstrip("-").isdigit() and "id" in texty:
             args["id"] = loose[0]
@@ -245,7 +258,7 @@ def _emit(v, depth, key, out):
 def overview(server):
     print(bold("rs3cache") + ": the RuneScape 3 game data on your computer, as tools you can ask.\n")
     print("Try:")
-    # every example has to work on a fresh copy, so no var names and nothing from an add-on
+    # every example works on a fresh copy
     have = {t["name"] for t in server.TOOLS}
     quest = [("rs3 quest \"Cook's Assistant\"", "a quest's var and walkthrough")]
     if "rs3_quest" not in have:
@@ -464,7 +477,7 @@ def main(argv=None):
     except (AttributeError, ValueError):
         pass
     if argv and argv[0] in ("setup", "doctor", "rebuild"):
-        # these work before there is a database, so they do not load the tools
+        # these work before there is a database
         return {"setup": lambda: setup(argv[1:]), "doctor": doctor, "rebuild": lambda: rebuild(argv[1:])}[argv[0]]()
     if argv and argv[0] in ("-h", "--help") and len(argv) == 1:
         print(__doc__)

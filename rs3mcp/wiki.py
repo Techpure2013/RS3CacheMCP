@@ -32,14 +32,14 @@ from .common import ROOT, connect
 
 STORE = os.path.join(ROOT, "rs3-wiki.db")
 API = "https://runescape.wiki/api.php"
-# The wiki asks bots to say who runs them. Whoever runs this sets RS3MCP_CONTACT; an add-on can too.
+# the wiki asks bots to say who runs
 UA = "rs3cache/1.0 (local tooling over the RS3 game cache; contact via %s)" % (
     os.environ.get("RS3MCP_CONTACT") or "the person running rs3cache, who has not set RS3MCP_CONTACT")
 
 # one second between requests, never parallel
 GAP = 1.0
 _LAST = [0.0]
-# why the last request failed, so the answer can say "unreachable" instead of "no such page"
+# why the last request failed, for the answer
 _ERR = [None]
 _DB = {}
 
@@ -88,8 +88,7 @@ def _get(params):
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     _ERR[0] = None
     for attempt in range(3):
-        # urlopen's shared opener loads the certificate store once, so after Windows has fetched a
-        # root it takes a context of its own to see it
+        # its own context to see a new root
         ctx = ssl.create_default_context() if _DB.get("rootFetched") else None
         try:
             with urllib.request.urlopen(req, timeout=25, context=ctx) as r:
@@ -114,8 +113,7 @@ def wikitext(title, refresh=False):
     """Page source, from the local store unless it is missing or a refresh is asked for."""
     conn = _db()
     row = conn.execute("select wikitext, missing, fetched from page where title=?", (title,)).fetchone()
-    # a missing page is asked about again after a day, since pages get written and outages were
-    # once stored as missing too
+    # a missing page is asked about again daily
     if row and not refresh and not (row[1] and time.time() - row[2] > 86400):
         return None if row[1] else row[0]
 
@@ -123,7 +121,7 @@ def wikitext(title, refresh=False):
               "rvslots": "main", "titles": title, "redirects": 1})
     text = None
     if d is None:
-        # a failed request says nothing about the page, and storing it as missing kept it missing
+        # a failed request says nothing about the page
         return row[0] if row and not row[1] else None
     if d:
         pages = (d.get("query") or {}).get("pages") or {}
@@ -265,7 +263,7 @@ def _resolve(name):
     ids for one name is normal and not an error."""
     ids = _item_ids().get((name or "").strip().lower())
     if not ids:
-        # the wiki writes "Coins" where the cache has several coin configs, and brackets a dose
+        # the wiki writes Coins where the cache splits
         base = re.sub(r"\s*\(\d+\)$", "", name or "").strip().lower()
         ids = _item_ids().get(base)
     return sorted(ids)[:6] if ids else None

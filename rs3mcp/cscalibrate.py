@@ -32,10 +32,12 @@ MAGIC = b"RSCS1"
 KINDS = ("byte", "int", "const", "tribyte")
 # id for an op the reference never had
 NEW_OP = 900000
-# readings kept per script, and unknown numbers allowed in one
+# readings kept per script, and unknowns allowed
 TRIES = 64
 UNKNOWNS = 6
-# share of scripts that must be unchanged. Simulated: exact at 25% edited, wrong at 50%
+# a script whose old copy pairs every unknown
+WIDE_UNKNOWNS = 8
+# share of scripts that must be unchanged
 TRUST = 0.6
 
 
@@ -158,7 +160,7 @@ def _settle(votes, taken=None):
     return taken
 
 
-def _readings(raw, known, kinds, limit=TRIES):
+def _readings(raw, known, kinds, limit=TRIES, unknowns=UNKNOWNS):
     """Ways to read a script with unknown numbers: [(instructions, {number: kind})]. Each unknown is
     tried at every width; a reading must use every instruction and byte."""
     try:
@@ -166,7 +168,7 @@ def _readings(raw, known, kinds, limit=TRIES):
     except (cs.Bad, struct.error, IndexError):
         return []
     count, n, found = head["count"], len(code), []
-    # after a wrong width every byte pair looks unknown, so cap the branches
+    # after a wrong width everything looks unknown
     budget = [limit * 256]
 
     def imm(kind, i):
@@ -189,7 +191,7 @@ def _readings(raw, known, kinds, limit=TRIES):
         return None
 
     def walk(i, out, guess):
-        # branches only at a new unknown, so depth is unknowns, not instructions
+        # branches only at a new unknown, not instructions
         mark = len(out)
         while len(found) < limit:
             if len(out) == count:
@@ -207,7 +209,7 @@ def _readings(raw, known, kinds, limit=TRIES):
                 out.append((op, got[0]))
                 i = got[1]
                 continue
-            if len(guess) >= UNKNOWNS:
+            if len(guess) >= unknowns:
                 break
             for kind in KINDS:
                 budget[0] -= 1
@@ -284,7 +286,7 @@ def from_changed(ref_map, ref, new, pairs):
                         widths[num][kind] += 1
                 continue
             old_ops, old_nums = theirs
-            # best alignment, then most pairs at their old width
+            # best alignment, then most pairs at old width
             scored = []
             for code, guess in found:
                 a, b, sm = _aligned(old_ops, code)
@@ -308,6 +310,38 @@ def from_changed(ref_map, ref, new, pairs):
     return pairs, left, widths
 
 
+def from_wide(ref_map, ref, new, known, pairs):
+    """Pairs from scripts with more unknowns than the first pass tries, {new: old}.
+
+    Taken only when the best reading against the old copy pairs every unknown one to one with an
+    old op nothing claimed, at its old width. A script can hold several ops no other script uses."""
+    claimed = {old for old in pairs.values() if old is not None}
+    added = {}
+    for sid, raw in sorted(new.items()):
+        if sid not in ref or _opcode_fields(raw, known) is not None:
+            continue
+        nums = _numbered(ref[sid], ref_map)
+        if nums is None:
+            continue
+        old_ops, old_nums = [(ref_map[n][0], imm) for n, imm in nums], [n for n, _ in nums]
+        scored = []
+        for code, guess in _readings(raw, known, {}, unknowns=WIDE_UNKNOWNS):
+            a, b, sm = _aligned(old_ops, code)
+            got = set(_block_pairs(old_nums, a, b, sm, claimed,
+                                   lambda old, num, g=guess: g.get(num) == ref_map[old][1]))
+            olds = {old for old, _ in got}
+            if {num for _, num in got} == set(guess) and len(got) == len(guess) == len(olds):
+                scored.append((sm.ratio(), got))
+        scored.sort(key=lambda s: -s[0])
+        if scored and (len(scored) == 1 or scored[0][0] > scored[1][0]):
+            for old, num in scored[0][1]:
+                added[num] = old
+                known[num] = ref_map[old]
+                claimed.add(old)
+    pairs.update(added)
+    return added
+
+
 def _reader(ref_map, pairs, widths=None):
     """{new number: (op, width)}, preferring the width the new scripts read at."""
     out = {}
@@ -327,16 +361,19 @@ def calibrate(ref_ops, ref, new, say=print):
 
     pairs, left, widths = from_changed(ref_ops, ref, new, first)
     known = _reader(ref_ops, pairs, widths)
-    # what lined up with nothing old is an op this update added
+    # what matched nothing old is a new op
     fresh = {num: (NEW_OP + num, kind) for num, kind in sorted(left.items())}
     known.update(fresh)
     pairs.update({num: None for num in fresh})
+    wide = from_wide(ref_ops, ref, new, known, pairs)
+    if wide:
+        say("calibration: %d more from scripts with many unknowns" % len(wide))
     unread = sum(1 for raw in new.values() if _opcode_fields(raw, known) is None)
+    changed = len(pairs) - len(first) - len(fresh) - len(wide)
     say("calibration: %d more from changed scripts, %d new, %d scripts still unread"
-        % (len(pairs) - len(first) - len(fresh), len(fresh), unread))
-    return known, pairs, {"unchanged": unchanged, "fromUnchanged": len(first),
-                          "fromChanged": len(pairs) - len(first) - len(fresh),
-                          "new": len(fresh), "unread": unread}
+        % (changed, len(fresh), unread))
+    return known, pairs, {"unchanged": unchanged, "fromUnchanged": len(first), "fromChanged": changed,
+                          "fromWide": len(wide), "new": len(fresh), "unread": unread}
 
 
 def save_map(known, pairs, path=cs.OPMAP, keep=None):
@@ -359,6 +396,131 @@ def save_map(known, pairs, path=cs.OPMAP, keep=None):
     json.dump(old, io.open(path, "w", encoding="utf-8"), indent=0, sort_keys=True)
 
 
+def _effects():
+    """Every small stack effect an unknown op could have: (pops, pushes)."""
+    from rs3mcp import csstack as st
+    out = []
+    for ni in range(6):
+        for nl in range(3):
+            for ns in range(3):
+                for pi in range(3):
+                    for pl in range(2):
+                        for ps in range(2):
+                            out.append(([st.I] * ni + [st.L] * nl + [st.S] * ns,
+                                        [st.I] * pi + [st.L] * pl + [st.S] * ps))
+    return out
+
+
+def stack_ties(known, pairs, new, say=print):
+    """Widths for scripts with more than one reading, from which one the stacks allow.
+
+    Only readings with the fewest unknowns are tried, each unknown at every small effect. A reading
+    no effect can simulate is wrong; one the checker cannot finish is kept. Readings that both
+    simulate go to _likeliest. A script settles when one reading is left, and its unknowns go into
+    known and pairs as new ops. Returns the number settled."""
+    import shutil
+    import tempfile
+    from rs3mcp import csstack as st
+
+    unread = {sid: raw for sid, raw in new.items() if _opcode_fields(raw, known) is None}
+    choices = {}
+    for sid, raw in unread.items():
+        found = _readings(raw, known, {})
+        if found:
+            fewest = min(len(g) for _c, g in found)
+            choices[sid] = [g for _c, g in found if len(g) == fewest]
+    if not choices:
+        return 0
+    # each unknown at its first width
+    trial = dict(known)
+    for guesses in choices.values():
+        for num, kind in guesses[0].items():
+            trial.setdefault(num, (NEW_OP + num, kind))
+    tmp = tempfile.mkdtemp()
+    try:
+        path = os.path.join(tmp, "opmap.json")
+        shutil.copyfile(cs.OPMAP, path)
+        save_map(trial, pairs, path=path)
+        ctx = st.Context(path)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    st.settle(ctx)
+    effects = _effects()
+    seen = collections.Counter()
+    for sid, code in ctx.code.items():
+        if sid not in choices:
+            seen.update((a[0], b[0]) for a, b in zip(code, code[1:]))
+    settled = 0
+    for sid, readings in sorted(choices.items()):
+        kept = []
+        for guess in readings:
+            opmap = dict(ctx.opmap)
+            opmap.update({num: (NEW_OP + num, kind) for num, kind in guess.items()})
+            head = cs.read(unread[sid], opmap)
+            ctx.code[sid], ctx.heads[sid] = head.pop("code"), head
+            code = list(ctx.code[sid])
+            verdict = "wrong"
+            for pops, pushes in effects if len(guess) == 1 else [None]:
+                if pops is not None:
+                    ctx.fixed[NEW_OP + next(iter(guess))] = (pops, pushes)
+                try:
+                    st.simulate(ctx, sid)
+                    verdict = "clean"
+                    break
+                except st.Stuck:
+                    verdict = "unsure"
+                except st.Wrong:
+                    pass
+            for num in guess:
+                ctx.fixed.pop(NEW_OP + num, None)
+            if verdict != "wrong":
+                kept.append((verdict, guess, code))
+        clean = [(g, c) for v, g, c in kept if v == "clean"]
+        left = clean or [(g, c) for _v, g, c in kept]
+        how = "its stacks"
+        if len(left) > 1:
+            left, how = _likeliest(left, seen), "its stacks and the op pairs other scripts use"
+        if len(left) == 1:
+            for num, kind in left[0][0].items():
+                known[num] = (NEW_OP + num, kind)
+                pairs[num] = None
+            settled += 1
+            say("calibration: script %d settled by %s, %s" % (sid, how, left[0][0]))
+    return settled
+
+
+def _likeliest(readings, seen, margin=10):
+    """[the one reading] whose op pairs the rest of the cache uses, else all of them.
+
+    Each reading is scored by the rarest pair of neighbouring ops only it has, leaving out the
+    unknown. It wins when that is margin times as common as the next reading's. A wrong width
+    misframes the op after it into a pair the cache all but never uses."""
+    def pairs(code):
+        return {(a[0], b[0]) for a, b in zip(code, code[1:]) if a[0] < NEW_OP and b[0] < NEW_OP}
+    own = [pairs(c) for _g, c in readings]
+    shared = set.intersection(*own)
+    scores = sorted(((min((seen[p] for p in mine - shared), default=float("inf")), k)
+                     for k, mine in enumerate(own)), reverse=True)
+    if scores[1][0] != float("inf") and scores[0][0] >= margin * max(1, scores[1][0]):
+        return [readings[scores[0][1]]]
+    return readings
+
+
+def kept_numbers(known, current):
+    """Fill known from the map in use when every op placed agrees with it, and say whether it did.
+
+    The 2026-09-21 update kept its numbers: all 1,241 placed ops matched, and two scripts used ops
+    no unchanged script did, so the update went unsaved over ops the map already had right. A real
+    shuffle cannot agree that often by chance, hence the half-the-map floor."""
+    if len(known) < len(current) // 2:
+        return False
+    if any(current.get(str(num), {}).get("op") != op for num, (op, _kind) in known.items()):
+        return False
+    for num, entry in current.items():
+        known.setdefault(int(num), (entry["op"], entry.get("imm")))
+    return True
+
+
 def calibrate_cache(say=print, root=None):
     """Calibrate the cache on disk against the reference. Saves only when every script reads and
     enough are unchanged. Returns the report, or None without a reference."""
@@ -368,6 +530,14 @@ def calibrate_cache(say=print, root=None):
     _head, ref_ops, ref = load_reference()
     new = dict(cs.scripts(root))
     known, pairs, report = calibrate(ref_ops, ref, new, say)
+    if report["unread"] and kept_numbers(known, _map_file()["ops"]):
+        report["unread"] = sum(1 for raw in new.values() if _opcode_fields(raw, known) is None)
+        report["keptNumbers"] = True
+        say("calibration: every op placed agrees with the map in use, so this update kept its "
+            "numbers; %d scripts still unread" % report["unread"])
+    if report["unread"] and root is None:
+        report["settledByStacks"] = stack_ties(known, pairs, new, say)
+        report["unread"] = sum(1 for raw in new.values() if _opcode_fields(raw, known) is None)
     share = report["unchanged"] / float(len(new) or 1)
     report["saved"] = report["unread"] == 0 and share >= TRUST
     if report["saved"]:

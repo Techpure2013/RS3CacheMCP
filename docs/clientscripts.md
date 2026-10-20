@@ -67,8 +67,8 @@ The search index relies on these patterns, so they don't change.
 
 ## Where it stands
 
-All 21,098 scripts come out as normal code, with no gotos. About 31 ids that rsmv knew the type of
-are untyped here. They're all values whose type depends on what happens while the game runs.
+All 21,098 scripts come out as normal code, with no gotos. About 31 ids are still untyped. They're
+all values whose type depends on what happens while the game runs.
 
 ## Game updates
 
@@ -90,8 +90,8 @@ When the rebuild finds a new update, it:
 - makes this update the new reference once every script works, so the next update is compared with
   this one.
 
-If the numbers can't be worked out, it uses rsmv if you have it. If you don't, it installs the rest
-of the database and keeps the old scripts.
+If the numbers can't be worked out, it installs the rest of the database and keeps the old
+scripts.
 
 So far this has only been tested on fake updates: this cache with every number shuffled, and some
 scripts changed, removed or added. With 3%, 10% and 25% of scripts changed, it got every number

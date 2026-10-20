@@ -10,17 +10,16 @@ import sqlite3
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# BASE holds the server and scripts, ROOT what they build (data/, or RS3MCP_DATA, which a sandbox
-# copy sets to read the real cache), and WORKSPACE the folder of projects around this one.
+# BASE holds the server, ROOT what it builds
 BASE = os.path.dirname(HERE)
-ROOT = os.environ.get("RS3MCP_DATA") or os.path.join(BASE, "data")
-WORKSPACE = os.environ.get("RS3MCP_WORKSPACE") or os.path.dirname(os.path.dirname(ROOT))
+DEFAULT_ROOT = os.path.join(BASE, "data")
+ROOT = os.environ.get("RS3MCP_DATA") or DEFAULT_ROOT
+# a second build beside the default, the beta
+OWN_ROOT = os.path.normcase(os.path.abspath(ROOT)) != os.path.normcase(os.path.abspath(DEFAULT_ROOT))
 
 DB = os.path.join(ROOT, "rs3-cache.db")
 SPRITES = os.path.join(ROOT, "rs3-cache-stage", "sprites")
 CLIENTSCRIPT = os.path.join(ROOT, "rs3-cache-stage", "clientscript")
-
-RSMV = os.path.join(WORKSPACE, "_RS3_Data", "rsmv-master")
 
 
 def name_lists():
@@ -85,8 +84,7 @@ def rows_to_json(cur, limit):
         out.append({c: r[c] for c in cols})
         if len(out) >= limit:
             break
-    # Say so when the answer is cut short. A silently truncated result reads as "that is all of
-    # them", which is worse than no answer.
+    # say so when the answer is cut short
     more = cur.fetchone() is not None
     return {"columns": cols, "rows": out, "truncated": more,
             "note": ("more rows exist, raise limit or narrow the query" if more else None)}
@@ -94,10 +92,9 @@ def rows_to_json(cur, limit):
 
 # ------------------------------------------------------------------- caching a scan of the tree
 #
-# Several tools start by reading a whole tree or a whole table, which takes seconds. Every mcp
-# session is a new process, so it lands on the first question asked.
+# the first question pays for the whole read
 #
-# The answer goes on disk under a fingerprint of its inputs, so editing one rebuilds it.
+# kept under a fingerprint of its inputs
 
 import hashlib  # noqa: E402
 import io  # noqa: E402
@@ -151,8 +148,7 @@ def cached_scan(name, stamp, build):
 
 # --------------------------------------------------------------------------- the tool registry
 #
-# The harnesses read the server's own registry, which is what stopped four going stale. Reading it
-# executes rs3-mcp.py, so once per process: per caller cost rs3_drift two imports a call.
+# the harnesses read the server's own registry
 
 _REGISTRY = {}
 _SERVER = {}

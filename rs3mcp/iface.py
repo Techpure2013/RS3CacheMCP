@@ -32,20 +32,16 @@ SHIFT = 16
 CHILD = (1 << SHIFT) - 1
 ROOT = 65535
 
-# the kind byte, confirmed by counting
-# Every type 5 has a sprite block and nothing else does, and so on down. The rest carry no
-# block, so they stay unnamed rather than guessed at.
+# the kind byte, confirmed by counting blocks
 KINDS = {0: "container", 3: "figure", 4: "text", 5: "sprite", 6: "model", 9: "line"}
 
 BLOCK = {"sprite": "sprite", "text": "text", "model": "model", "figure": "rectangle", "line": "line"}
 
-# an animation id of 32767 is the empty two byte form
+# an animation id of 32767 is empty
 NO_ANIM = (-1, 32767, None)
 
 
-# Every component carrying drawn text, read once. The LIKE that used to answer text= walked all
-# 104,276 components for 157ms, and it cannot use an index because the pattern leads with a
-# wildcard. Keyed on the database's mtime so a rebuild drops it.
+# every component carrying drawn text, read once
 _CACHE = {}
 
 
@@ -216,7 +212,7 @@ def tool_iface(args):
         out = {"found": len(hits), "components": hits,
                "note": "components whose drawn text contains that. The string is the one baked "
                        "into the interface, so anything the game fills in at runtime is not here."}
-        # Text the game writes at runtime is in no cache, only in a dump taken with it on screen
+        # runtime text is in no cache, only dumps
         if live:
             out["fromLiveDumps"] = live
             out["note"] += (" fromLiveDumps is the other half: text found in interface dumps, "
@@ -244,7 +240,7 @@ def tool_iface(args):
                                        ).fetchone()[0],
                "note": "ids are packed interface<<16|component. Pass id=284, id=\"284:5\" or a "
                        "raw packed id, or search= by name, or text= by what is drawn on screen."}
-        # which ones have been dumped, so the gap is visible rather than rediscovered per interface
+        # which ones have been dumped, so gaps show
         seen = _dumps().dumped()
         if seen:
             out["liveDumps"] = seen
@@ -290,8 +286,7 @@ def tool_iface(args):
         if b["parent"] is None:
             roots.append(b["component"])
         comps.append(b)
-    # The root is rarely component 0. Sampling 400 interfaces, 251 hang everything off something
-    # else, so walking down from 0 starts in the wrong place more often than not.
+    # the root is rarely component 0
     out = {"interface": iface, "name": name, "components": len(comps),
            "root": roots[0] if len(roots) == 1 else roots,
            "kinds": kinds, "packedBase": _pack(iface, 0),
@@ -300,18 +295,12 @@ def tool_iface(args):
                          if len(comps) > limit else None),
            "note": "parent is the component this one hangs off, null for the root. Add "
                    "component= or ask by \"%d:n\" for one on its own." % iface}
-    # A skeleton, not the screen. Some interfaces are containers and nothing else, BUFF_BAR the
-    # largest of them: the sprites and text inside are built by the client while it runs, so
-    # reading only this would say the buff bar draws nothing.
-    # A dump is what the interface actually held, so it answers the question the cache cannot,
-    # whether or not the skeleton looked empty.
+    # a skeleton of the interface, not the screen
     seen = _dumps().summary(iface, limit)
     if seen is not None:
         out["live"] = seen
 
-    # Which scripts name it, whatever it is built from. This used to fire only for the all
-    # container case, so CHOICE_V2 -- the option box every dialogue step matches on -- had five
-    # scripts against it and the tool said nothing.
+    # which scripts name it, whatever it holds
     refs = _building_scripts(iface)
     if refs:
         out["referencedByScripts"] = refs

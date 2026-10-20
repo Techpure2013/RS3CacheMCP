@@ -45,18 +45,23 @@ def _vscode(*parts):
     return _appdata("Code", "User", *parts)
 
 
-def entry():
+def entry(key=None):
     """The command an app runs to start the server: this python, this server, and the game cache
-    location when it is not the default."""
+    location when it is not the default.
+
+    Claude Code loads tools on demand, so the full listing costs it nothing up front; every other
+    app is given the compact profile, three tools that find and run the rest."""
     rec = {"command": sys.executable.replace("\\", "/"), "args": [SERVER.replace("\\", "/")]}
     env = {k: os.environ[k] for k in ("RS3MCP_GAME_CACHE", "RS3MCP_ADDONS", "RS3MCP_DATA")
            if os.environ.get(k)}
+    if key is not None and key != "claude-code":
+        env["RS3_TOOLSETS"] = "compact"
     if env:
         rec["env"] = env
     return rec
 
 
-# key, label, folder whose existence says the app is installed, config file, format
+# key, label, folder, config file and format
 APPS = [
     ("claude-code", "Claude Code", lambda: _home(".claude"), lambda: _home(".claude.json"), "claude-code"),
     ("claude-desktop", "Claude Desktop", lambda: _appdata("Claude"),
@@ -169,7 +174,7 @@ def add(key):
     """(status, where, snippet). status is added, already or manual; a manual one comes with the
     entry to paste."""
     _k, label, _folder, config, fmt = BY_KEY[key]
-    path, rec = config(), entry()
+    path, rec = config(), entry(key)
     if fmt == "mcpServers":
         got, snip = _json_with(path, "mcpServers", rec)
         return got, path, snip
@@ -239,7 +244,7 @@ def _goose(path, rec):
 
     at = next((i for i, l in enumerate(lines) if l.rstrip() == "extensions:"), None)
     if at is None and any(l.startswith("extensions:") for l in lines):
-        # written inline, `extensions: {}`, which text insertion would break
+        # written inline, which text insertion would break
         return "manual", path, "\n".join(["extensions:"] + block("  "))
     if at is None:
         lines += ["extensions:"] + block("  ")

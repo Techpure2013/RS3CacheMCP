@@ -8,7 +8,7 @@ import io, json, os, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-# From the server's registry. A copy lived here once and went stale.
+# from the server's registry, not a local copy
 import runpy
 BY_NAME = runpy.run_path(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "rs3-mcp.py"))["BY_NAME"]
@@ -30,7 +30,7 @@ CALLS = [
     ("rs3_script_refs", {"kind": "varbit", "id": "27169"}),
     ("rs3_wiki", {}),
 ]
-# an add-on's own tools, timed on the questions it records answers for
+# an add-on's own tools, on its recorded questions
 from rs3mcp import addons  # noqa
 for _extra in addons.every("golden_calls"):
     CALLS += [(name, args) for name, args, *_need in _extra()]
@@ -52,15 +52,12 @@ def timed(name, args):
         return None, None, str(e)[:60]
 
 
-# Anything registered is listed here or named as skipped. The list that lived in this file went
-# stale and left five families unmeasured while the run printed "0 tools over 250ms".
-# Tools that are slow because of what they do, not because of how they are written. Named with a
-# reason so the bar stays meaningful: anything else over it is a regression.
+# listed here, or named as skipped with reason
 EXPECTED_SLOW = {
     "rs3_cache_diff": "joins two 600MB databases; it runs once after a rebuild, not in a loop",
 }
 
-# the same exemptions the soak takes, for the same reasons
+# the same exemptions the soak takes
 SKIP = {}
 for _extra in addons.every("soak_skip"):
     SKIP.update(_extra)

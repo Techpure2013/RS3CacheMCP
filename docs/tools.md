@@ -2,7 +2,7 @@
 
 [All docs](README.md) › Using it
 
-Every tool, in 5 groups. There are 15 in all. AI apps and the `rs3` command use the same tools. Apps see the full name, like `rs3_lookup`. In `rs3` you can leave off the `rs3_`.
+Every tool, in 5 groups. There are 16 in all. AI apps and the `rs3` command use the same tools. Apps see the full name, like `rs3_lookup`. In `rs3` you can leave off the `rs3_`.
 
 This page is written automatically by `rs3 docs`, so don't edit it by hand.
 
@@ -13,7 +13,7 @@ Every tool also takes `pick`, to get just one part of an answer (`pick=counts.np
 | [cache](#cache) | [cache_diff](#cache_diff), [family](#family), [lookup](#lookup), [query](#query), [schema](#schema), [sprite](#sprite), [trace](#trace) |
 | [docs](#docs) | [wiki](#wiki) |
 | [game](#game) | [dbtable](#dbtable), [iface](#iface), [var](#var) |
-| [meta](#meta) | [drift](#drift) |
+| [meta](#meta) | [drift](#drift), [research](#research) |
 | [scripts](#scripts) | [script](#script), [script_read](#script_read), [script_refs](#script_refs) |
 
 ## cache
@@ -79,7 +79,7 @@ Over MCP: `{"name": "rs3_lookup", "arguments": {"kind": "npc", "name": "Wolf"}}`
 
 `rs3_query`, reads only.
 
-Run a read-only SELECT against the RS3 cache database and get rows as JSON.
+Run a read-only SQL SELECT against the RS3 cache database and get rows as JSON.
 
 | Argument | Type | | What |
 |---|---|---|---|
@@ -246,13 +246,34 @@ rs3 drift
 
 Over MCP: `{"name": "rs3_drift", "arguments": {}}`
 
+### research
+
+`rs3_research`, writes or runs something, reaches the network.
+
+Research paid once: q finds what is known; fetch stores a page (refresh needs a reason); add keeps a quoted finding; show and review are for checking one.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `q` | string |  |  |
+| `fetch` | string |  |  |
+| `refresh` | string |  |  |
+| `add` | object |  | claim, url, quote, topic |
+| `show` | string |  |  |
+| `review` | object |  | id, verdict (holds\|overclaims\|wrong\|unsupported), why, better |
+
+```
+rs3 research q="how LSP reports a file edit"
+```
+
+Over MCP: `{"name": "rs3_research", "arguments": {"q": "how LSP reports a file edit"}}`
+
 ## scripts
 
 ### script
 
 `rs3_script`, reads only.
 
-Search the 21,098 decompiled clientscripts for a pattern, with surrounding lines. These settle what the cache cannot: what writes a varbit, what reads it, what a value means. About a second. rs3_script_read takes the id this returns; rs3_script_refs goes the other way, from a varbit or item id.
+Search the 21,101 decompiled clientscripts for a pattern, with surrounding lines. These settle what the cache cannot: what writes a varbit, what reads it, what a value means. About a second. rs3_script_read takes the id this returns; rs3_script_refs goes the other way, from a varbit or item id.
 
 | Argument | Type | | What |
 |---|---|---|---|

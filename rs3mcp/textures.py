@@ -4,8 +4,12 @@ Both wrap the image the same way: a count byte, then for bmp width and height as
 for dds a u32 size and a dds file of DXT1 or DXT5 blocks. Material textures carry a 32 pixel
 border for filtering, which is cut off. The client fetches the bmp index as it needs it, so
 image() falls back to the dds copy, which is complete but lossy.
+
+A normal map's dds copy keeps X in alpha and Y in green, and its blue is 0. The bmp copy has Z in
+blue, sqrt(1 - x^2 - y^2) scaled from -1..1 to 0..255, so dds() rebuilds it the same way.
 """
 
+import math
 import struct
 
 from . import cachefile
@@ -13,6 +17,35 @@ from . import cachefile
 BMP = 54
 DDS = 52
 PAD = 32
+
+_normals = None
+_z = None
+
+
+def normal_maps():
+    """Texture ids a material names as its normal map. Empty without the database."""
+    global _normals
+    if _normals is None:
+        from . import common
+        try:
+            con = common.connect()
+        except RuntimeError:
+            return set()
+        # version 0 holds the id, later ones more
+        rows = con.execute("select coalesce(json_extract(data, '$.v0.normal'), "
+                           "json_extract(data, '$.v1.normal.texture')) from config where type = 'materials'")
+        _normals = {r[0] for r in rows if isinstance(r[0], int)}
+        con.close()
+    return _normals
+
+
+def _ztable():
+    # blue for alpha * 256 + green
+    global _z
+    if _z is None:
+        _z = bytes(round((math.sqrt(max(0.0, 1 - (x / 127.5 - 1) ** 2 - (y / 127.5 - 1) ** 2)) + 1) * 127.5)
+                   for x in range(256) for y in range(256))
+    return _z
 
 
 def _file(major, tex, root):
@@ -56,6 +89,7 @@ def dds(tex, root=None):
     if four not in (b"DXT1", b"DXT5"):
         return None
     alpha = four == b"DXT5"
+    z = _ztable() if alpha and tex in normal_maps() else None
     step = 16 if alpha else 8
     bw, bh = (w + 3) // 4, (h + 3) // 4
     if len(body) < 128 + bw * bh * step:
@@ -76,8 +110,9 @@ def dds(tex, root=None):
             (r0, g0, b0), (r1, g1, b1) = _expand(c0), _expand(c1)
             cols = [(r0, g0, b0, 255), (r1, g1, b1, 255)]
             if c0 > c1 or alpha:
-                cols += [((2 * r0 + r1) // 3, (2 * g0 + g1) // 3, (2 * b0 + b1) // 3, 255),
-                         ((r0 + 2 * r1) // 3, (g0 + 2 * g1) // 3, (b0 + 2 * b1) // 3, 255)]
+                # the plus one is the DXT1 page's rounding
+                cols += [((2 * r0 + r1 + 1) // 3, (2 * g0 + g1 + 1) // 3, (2 * b0 + b1 + 1) // 3, 255),
+                         ((r0 + 2 * r1 + 1) // 3, (g0 + 2 * g1 + 1) // 3, (b0 + 2 * b1 + 1) // 3, 255)]
             else:
                 cols += [((r0 + r1) // 2, (g0 + g1) // 2, (b0 + b1) // 2, 255), (0, 0, 0, 0)]
             index = struct.unpack_from("<I", body, (c if alpha else at) + 4)[0]
@@ -88,7 +123,9 @@ def dds(tex, root=None):
                 r, g, b, a = cols[(index >> (2 * p)) & 3]
                 if alpha:
                     a = alphas[(bits >> (3 * p)) & 7]
-                o = (y * w + x) * 4
+                    if z:
+                        b = z[a * 256 + g]
+                o =(y * w + x) * 4
                 px[o:o + 4] = bytes((r, g, b, a))
             at += step
     return _crop(w, h, bytes(px))

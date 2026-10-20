@@ -6,6 +6,8 @@ group 1
 
 0x01 text            string
 0x02 replies         list[u8]<u16 -> quickchatlines>
+0x03 slots           list[u8]<{u16 kind; u16 enum -> enums if kind==0; u16 skill if kind==4; u16 enum6 -> enums if kind==6; u16 varp6 -> varplayer if kind==6; u16 varp -> varplayer if kind==8; u16 varbit -> varbits if kind==9; u16 unk11 if kind==11; u16 skill11 if kind==11; u16 unk14 if kind==14; u16 enum16 -> enums if kind==16; u16 varbit16 -> varbits if kind==16}>
+#                    beta: 0x05 with u16 values, not leb128 (checked 2026-09-25)
 0x04 notSearchable   true
 0x05 slots           list[u8]<{u16 kind; leb128 enum -> enums if kind==0; leb128 skill if kind==4; leb128 enum6 -> enums if kind==6; leb128 varp6 -> varplayer if kind==6; leb128 varp -> varplayer if kind==8; leb128 varbit -> varbits if kind==9; leb128 unk11 if kind==11; leb128 skill11 if kind==11; leb128 unk14 if kind==14; leb128 enum16 -> enums if kind==16; leb128 varbit16 -> varbits if kind==16}>
 #                    each < in the text is a slot. Kinds 1, 10, 12 and 15 take nothing: an item picker, a trade

@@ -22,7 +22,7 @@ def types():
 
 
 def _plain(v):
-    # params keep int keys in python; json wants strings, and build_db turns them back
+    # params keep int keys, json wants strings
     if isinstance(v, dict):
         return {str(k): _plain(x) for k, x in v.items()}
     if isinstance(v, list):
@@ -48,12 +48,12 @@ def extract(stage, names=None, root=None, say=print):
             desc = cachefile.descriptor(spec["index"], root) or {}
             minors = sorted(desc) if spec["group"] is None else [None]
         files = sum(len(desc[m]["files"]) for m in minors if m is not None) or 1
-        # about 4,000 records a part, so interfaces spread over every core
+        # about 4,000 records a part, spread over cores
         n = max(1, min(WORKERS, files // 4000, len(minors)))
         step = -(-len(minors) // n)
         for k in range(0, len(minors), step):
             jobs.append((name, k, None if minors[k] is None else minors[k:k + step], root))
-    # the slowest first, so they start before the cores are all taken
+    # the slowest first, before the cores fill
     jobs.sort(key=lambda j: -len(j[2] or ()))
     parts = {}
     with multiprocessing.get_context("spawn").Pool(WORKERS) as pool:
@@ -78,7 +78,7 @@ def extract(stage, names=None, root=None, say=print):
 
 
 WORKERS = min(32, os.cpu_count() or 1)
-# types a spec cannot describe, each a module with MAJOR, records(root, minors) and decode(data)
+# types a spec cannot describe, one module each
 CUSTOM = {"models": models}
 
 

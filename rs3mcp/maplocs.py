@@ -41,7 +41,7 @@ def _tailed(b, i):
             return total, i
 
 
-# the extras a placement's flags byte names: (bit, name, struct format)
+# the extras a placement's flags byte names
 EXTRA = [(1, "rotation", ">4h"), (2, "translateX", ">h"), (4, "translateY", ">h"), (8, "translateZ", ">h"),
          (16, "scale", ">H"), (32, "scaleX", ">H"), (64, "scaleY", ">H"), (128, "scaleZ", ">H")]
 

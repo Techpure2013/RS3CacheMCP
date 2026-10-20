@@ -30,7 +30,9 @@ from urllib.parse import parse_qs, urlparse
 from . import addons
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PAGE = os.path.join(HERE, "monitor.html")
+# the console is the page now
+PAGE = os.path.join(HERE, "console.html")
+OLD_PAGE = os.path.join(HERE, "monitor.html")
 HOME = os.path.expanduser("~")
 PROJECTS = os.path.join(HOME, ".claude", "projects")
 PORT = int(os.environ.get("RS3_MONITOR_PORT") or 7331)
@@ -55,7 +57,7 @@ ACTIVE_HOURS = 24
 BACKFILL = 24 * 1024 * 1024
 KEEP = 40000
 
-# a tool run from a shell, either through the server script or the rs3 command
+# a tool run from a shell
 SHELL_TOOL = re.compile(r"(?:rs3-mcp\.py[\"']?\s+|\brs3(?:\.py|\.cmd)?[\"']?\s+)(?:rs3_)?(\w+)")
 NOT_A_PROMPT = ("<", "This session is being continued", "[Request interrupted", "Caveat:")
 
@@ -70,7 +72,7 @@ ACTS = {
     "Artifact": "publish", "SendUserFile": "publish", "Skill": "skill",
 }
 
-# Shell commands that run a file are a visit to that file. Quoted paths keep their spaces.
+# running a file counts as a visit
 WORD = re.compile(r"\"[^\"]*\"|'[^']*'|\S+")
 CD = re.compile(r"^\s*(?:cd|Set-Location)\s+(\"[^\"]+\"|'[^']+'|[^\s;&|]+)[^;&|\n]*(?:&&|;|\n)\s*", re.I)
 URL = re.compile(r"https?://([^/\s\"'<>]+)")
@@ -197,8 +199,7 @@ def shell_place(cmd, cwd=None):
         u = URL.search(first)
         if u:
             return "web/" + u.group(1), "fetch", shown
-    # A regex is not a path. Filenames count when they look like one; folders only when they exist,
-    # since `grep -rn "a/b"` otherwise invents a folder called a.
+    # a regex is not a path
     args = [w for w in words[1:] if w and not w.startswith("-") and not w.startswith(("$", "<", ">", "2>"))]
     for w in args:
         if FILEISH.search(w) and not REGEXY.search(w):
@@ -332,7 +333,7 @@ class Journal:
         self.globbed = now
         found = glob.glob(os.path.join(self.root, "*", "*.jsonl"))
         found += glob.glob(os.path.join(self.root, "*", "*", "subagents", "*.jsonl"))
-        # every other app, from what the rs3cache servers wrote down themselves
+        # every other app, from what they wrote down
         from .poollog import POOL
         found += glob.glob(os.path.join(POOL, "*", "*.jsonl"))
         for path in found:
@@ -416,7 +417,7 @@ class Journal:
                     ev["bypass"] = True
                 self.where[b.get("id")] = [f["path"], at, None]
                 self._emit(ev)
-                # only what happens while the page is open: the backfill is history, not a run
+                # only what happens while the page is open
                 if f.get("live") and act == "run" and self.on_test:
                     try:
                         self.on_test(where, s["title"] or s["project"] or s["id"][:8])
@@ -443,7 +444,7 @@ class Journal:
         if text and not text.startswith(NOT_A_PROMPT) and not s["parent"]:
             self._emit({"kind": "prompt", "sid": s["id"], "t": t, "text": text[:600]})
 
-    def poll(self, after=0):
+    def poll(self, after=0, since=0, until=0):
         with self.lock:
             self._find()
             for path, f in list(self.files.items()):
@@ -451,6 +452,11 @@ class Journal:
             if len(self.events) > KEEP:
                 del self.events[:len(self.events) - KEEP]
             new = [e for e in self.events if e["seq"] > after] if after else list(self.events)
+            # the last hour first, the rest behind it
+            if since:
+                new = [e for e in new if e.get("t", 0) >= since]
+            if until:
+                new = [e for e in new if e.get("t", 0) < until]
             people = {k: {x: y for x, y in v.items() if not x.startswith("_")}
                       for k, v in self.sessions.items()}
             return {"events": new, "next": self.seq, "sessions": people,
@@ -517,7 +523,7 @@ def _handler(journal, tools, box=None):
             self._send(200, json.dumps(obj, separators=(",", ":")).encode(), "application/json")
 
         def do_GET(self):
-            # A page on some other site could rebind a hostname to 127.0.0.1 and read prompts.
+            # another site could rebind a hostname to localhost
             port = self.server.server_address[1]
             if self.headers.get("Host") not in {a % port for a in allowed}:
                 return self._send(403, b"local only", "text/plain")
@@ -529,11 +535,18 @@ def _handler(journal, tools, box=None):
                 except OSError:
                     return self._send(500, b"monitor.html is missing", "text/plain")
                 return self._send(200, body, "text/html; charset=utf-8")
+            if url.path == "/map":
+                try:
+                    body = io.open(OLD_PAGE, "rb").read()
+                except OSError:
+                    return self._send(404, b"", "text/plain")
+                return self._send(200, body, "text/html; charset=utf-8")
             if url.path == "/meta":
                 return self._json({"tools": tools, "home": HOME.replace("\\", "/"), "user": USER,
                                    "sandbox": box is not None})
             if url.path == "/events":
-                return self._json(journal.poll(int((q.get("after") or ["0"])[0] or 0)))
+                num = lambda k: int((q.get(k) or ["0"])[0] or 0)
+                return self._json(journal.poll(num("after"), num("since"), num("until")))
             if url.path == "/call":
                 got = journal.call((q.get("id") or [""])[0])
                 if got is None:
@@ -548,8 +561,7 @@ def _handler(journal, tools, box=None):
             self._send(404, b"", "text/plain")
 
         def do_POST(self):
-            # Running code wants more than a local Host: a custom header, which a form on another
-            # page cannot send and a cross-site fetch cannot send without a preflight nobody answers.
+            # a custom header, which no form can send
             port = self.server.server_address[1]
             if self.headers.get("Host") not in {a % port for a in allowed} or self.headers.get("X-Pool") != "1":
                 return self._send(403, b"local only", "text/plain")
@@ -574,7 +586,7 @@ def _handler(journal, tools, box=None):
 
 
 class _Server(ThreadingHTTPServer):
-    # On Windows SO_REUSEADDR lets a second process bind the same port and steal half the requests.
+    # SO_REUSEADDR lets a second process steal requests
     allow_reuse_address = False
     daemon_threads = True
 
@@ -588,7 +600,7 @@ def serve(tools, advise=None, port=PORT, root=PROJECTS, retry=20):
         return None
     sets = {t["name"]: t["set"] for t in tools}
     journal = Journal(sets, root, advise)
-    # an add-on can run test suites the page watches; without one those routes answer 404
+    # an add-on's suites, or those routes answer 404
     runner = addons.first("pool_sandbox")
     box = runner.Sandbox() if runner else None
     if box:

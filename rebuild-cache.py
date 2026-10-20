@@ -26,10 +26,8 @@ The previous database is kept as rs3-cache.db.bak, and the sidecar index is rebu
 because every reader falls back to a slow path without it.
 """
 
-import io
 import json
 import os
-import re
 import shutil
 import subprocess
 import sqlite3
@@ -48,8 +46,6 @@ STAGE = os.path.join(DATA, "rs3-cache-stage-new")
 # "-" when there are no name lists, which build_db reads as none
 CSVS = common.name_lists() or "-"
 GAME = cachefile.GAME
-RSMV = common.RSMV
-CLI = os.path.join(RSMV, "dist", "cli.js")
 INDEXER = os.path.join(ROOT, "rs3mcp", "buildindex.py")
 
 # Every config type is decoded by rs3mcp/extract.py from rs3mcp/specs, the clientscripts are
@@ -64,6 +60,11 @@ LIVE_STAGE = os.path.join(DATA, "rs3-cache-stage")
 # failing is what blocks an install. Every config, model, clientscript and sprite decodes today, so
 # the list is empty and any failure is new. Add one only after looking at what fails and why.
 KNOWN_UNDECODED = {}
+# a build's own standing gaps, with a _why
+_GAPS = os.path.join(DATA, "known-undecoded.json")
+if os.path.exists(_GAPS):
+    KNOWN_UNDECODED.update({k: v for k, v in json.load(open(_GAPS, encoding="utf-8")).items()
+                            if not k.startswith("_")})
 SHRINK_LIMIT = 0.02
 
 
@@ -112,10 +113,17 @@ def clientscripts(folder):
 
     Our opcode map fits one update: Jagex renumbers every opcode each time. On an update the
     reference does not hold, the map is calibrated against the last one it read
-    (rs3mcp/cscalibrate.py). If that cannot be trusted and the map no longer reads every script,
-    rsmv does the job when there is a checkout of it."""
+    (rs3mcp/cscalibrate.py). If that cannot be trusted and the map no longer reads every script, the
+    scripts are skipped and the last good ones stay."""
     from rs3mcp import clientscript, cscalibrate, csdecomp
 
+    if clientscript.OPMAP != clientscript.SHIPPED_OPMAP and not os.path.exists(clientscript.OPMAP):
+        # seed a new folder from the shipped map
+        shipped = os.path.dirname(clientscript.SHIPPED_OPMAP)
+        os.makedirs(DATA, exist_ok=True)
+        shutil.copyfile(clientscript.SHIPPED_OPMAP, clientscript.OPMAP)
+        shutil.copyfile(os.path.join(shipped, "clientscript-reference.bin"), cscalibrate.REFERENCE)
+        say("clientscript: seeded this folder's map and reference from the shipped ones")
     fit = timed("clientscript opcode check", clientscript.verify)
     calibrated = None
     if fit["read"] != fit["scripts"]:
@@ -131,6 +139,8 @@ def clientscripts(folder):
     if fit["read"] == fit["scripts"]:
         ctx = timed("clientscript stack effects and types", csdecomp.run_deep, csdecomp.context)
         _, _, listed = timed("clientscript decompile", csdecomp.run_deep, csdecomp.write, folder, ctx, say)
+        from rs3mcp import scriptnames
+        timed("clientscript names", scriptnames.run, folder, None, None, say)
         saved = bool(calibrated and calibrated["saved"])
         if saved and listed:
             # a wrongly paired op shows as scripts whose stack no longer adds up
@@ -141,23 +151,10 @@ def clientscripts(folder):
             # calibrated to it, or with no reference at all: a map that merely reads is not enough
             timed("clientscript reference", cscalibrate.snapshot)
         return set(listed)
-    say("clientscript: using rsmv")
-    if not os.path.exists(CLI):
-        # the database is still worth installing without them
-        say("clientscript: no rsmv at %s either, so the scripts are not rebuilt this time" % RSMV)
-        return set()
-    # not batched: rs3_script finds a script by its file name
-    argv = ["node", "--max-old-space-size=16384", CLI, "extract", "--source", "cache:" + GAME,
-            "--mode", "clientscript", "--save", folder]
-    p = subprocess.run(argv, capture_output=True, text=True, cwd=RSMV)
-    with io.open(os.path.join(STAGE, "_clientscript.log"), "w", encoding="utf-8") as fh:
-        fh.write(p.stdout + p.stderr)
-    ids = {int(m) for m in re.findall(r"^file (\d+): ", p.stdout + p.stderr, re.M)}
-    # rsmv has never managed 2162: "cannot have else branch in loop"
-    ids.discard(2162)
-    say("clientscript       %7d files%s" % (len(os.listdir(folder)) if os.path.isdir(folder) else 0,
-                                             ", %d did not decode" % len(ids) if ids else ""))
-    return ids
+    # the database is still worth installing without them
+    say("clientscript: the opcode map could not be fitted to this update, so the scripts are not "
+        "rebuilt this time")
+    return set()
 
 
 def build():
@@ -165,8 +162,9 @@ def build():
     # our own scratch file and a leftover from a previous attempt would stop every future rebuild.
     if os.path.exists(NEW):
         os.remove(NEW)
-    # a first build has nothing to carry
-    carry = ["--carry", DB] if os.path.exists(DB) else []
+    # a first build carries from the default
+    first = os.path.join(common.DEFAULT_ROOT, "rs3-cache.db")
+    carry = ["--carry", DB] if os.path.exists(DB) else ["--carry", first] if os.path.exists(first) else []
     p = subprocess.run([sys.executable, os.path.join(ROOT, "build_db.py"), STAGE, CSVS, NEW] + carry,
                        capture_output=True, text=True, cwd=ROOT)
     if p.returncode != 0 or not os.path.exists(NEW):
@@ -327,6 +325,15 @@ def after():
     a different thing and is called out as one."""
     mcp = os.path.join(ROOT, "rs3-mcp.py")
 
+    # the sentences that count the data move with it, so they are rewritten before anything checks them
+    p = subprocess.run([sys.executable, "-c", "from rs3mcp.test import claims\n"
+                        "for path, was, now in claims.rewrite(): print(path, was, now)"],
+                       capture_output=True, text=True, cwd=ROOT)
+    for line in p.stdout.strip().splitlines():
+        say("  rewrote %s" % line)
+    if p.returncode != 0:
+        say("  the written counts could not be rewritten: %s" % (p.stderr.strip().splitlines() or ["?"])[-1])
+
     p = subprocess.run([sys.executable, mcp, "--selftest"], capture_output=True, text=True,
                        cwd=ROOT)
     tail = [l for l in p.stdout.strip().splitlines() if "checks" in l]
@@ -395,7 +402,15 @@ def main():
     # what is left of the stage is decoded json the database now holds, a few hundred MB nothing
     # reads again. A build that is not installed keeps it to look at.
     shutil.rmtree(STAGE, ignore_errors=True)
+    if common.OWN_ROOT:
+        # names again, now its database exists
+        from rs3mcp import scriptnames
+        timed("clientscript names", scriptnames.run, os.path.join(LIVE_STAGE, "clientscript"), None, None, say)
     timed("index", index)
+    if common.OWN_ROOT:
+        # docs describe the default build
+        say("rebuilt and installed in %.1fs; docs and checks left to the default build" % (time.time() - start))
+        return 0
     from rs3mcp import docs
     timed("docs", docs.write, None, None, lambda msg: None)
     say("rebuilt and installed in %.1fs" % (time.time() - start))

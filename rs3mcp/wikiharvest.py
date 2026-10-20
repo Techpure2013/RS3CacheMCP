@@ -109,7 +109,7 @@ def fetch(titles):
             seen.add(title)
             if text:
                 got += 1
-        # a redirect answers under its target, so mark the asked-for title too
+        # a redirect answers under its target, mark both
         for t in chunk:
             if t not in seen:
                 conn.execute("insert or replace into page values (?,?,?,?)",

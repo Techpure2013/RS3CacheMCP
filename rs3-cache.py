@@ -342,7 +342,7 @@ def itemName(c, iid):
 
 
 def showShop(c, word):
-    """Shop stock lives in invtype, page 5 of the config index, which rsmv does not decode.
+    """Shop stock lives in invtype, page 5 of the config index.
 
     Note what the cache does NOT say: nothing links an npc to its shop. There is no param typed
     INV on any npc, so the connection is made in clientscript. ARMOURSHOP is Horvik's by name and

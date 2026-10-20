@@ -1,10 +1,10 @@
-"""RS3 models, index 47: what each one is made of, without rsmv.
+"""RS3 models, index 47: what each one is made of.
 
     python -m rs3mcp.models <id> [...]      one model's summary
     python -m rs3mcp.models verify [n]      decode every model, or the first n, and count failures
 
-The layout is rsmv's opcodes/models.jsonc for current builds, plus the float positions, wrapped
-index counts and big endian int indices it does not know. Scalars are big endian unless marked;
+The layout covers current builds, including float positions, wrapped index counts and big
+endian int indices. Scalars are big endian unless marked;
 vertex buffers are little endian. A model has to decode to exactly its last byte, as the config specs do, so a field
 read wrong is a failure rather than a strange number.
 
@@ -22,7 +22,7 @@ from . import cachefile
 
 MAJOR = 47
 
-# TODO: our own model viewer on top of decode(mesh=True), not rsmv's. Needs materials,
+# TODO: a model viewer on top of decode(mesh=True). Needs materials,
 # textures and animation layered on before it is worth it.
 
 
@@ -114,12 +114,13 @@ def _decode(b, out):
             n = b.u16le() if f["vertices"] else 0
             if f["vertices"]:
                 positions.append(b.arr("h", n * 3))
-                b.take(n * 3)       # normals
+                normals = b.take(n * 3)
                 b.take(n * 4)       # tangents
                 uvs = b.take(n * 4)
                 if parts is not None:
                     parts.append({"positions": positions[-1], "colours": colours, "perFace": True,
-                                  "faces": [(material, lod0 or array.array("H"))], "uvs": uvs})
+                                  "faces": [(material, lod0 or array.array("H"))], "uvs": uvs,
+                                  "normals": normals})
             if f["boneIds"]:
                 b.take(n * 2)
             if f["skin"]:
@@ -131,15 +132,15 @@ def _decode(b, out):
             skinned, bones, alpha = skinned or f["skin"], bones or f["boneIds"], alpha or f["alpha"]
     else:
         f = flags(b.u8())
-        # 1 on models whose positions are big endian floats; rsmv's layout has only shorts
+        # 1 where positions are big endian floats
         floats = b.u8() == 1
         b.u16le()                   # face count, which the index buffers say better
         n = b.u32le()
         vertices = n
-        uvs = b""
+        uvs = normals = b""
         if f["vertices"]:
             positions.append(b.arr("f", n * 3, "big") if floats else b.arr("h", n * 3))
-            b.take(n * 3)           # normals
+            normals = b.take(n * 3)
             b.take(n * 4)           # tangents
             uvs = b.take(n * 4)
         if f["boneIds"]:
@@ -168,7 +169,7 @@ def _decode(b, out):
                 faces.append((material, _indices(b.b[head:head + k * width], width)))
         if parts is not None and positions:
             parts.append({"positions": positions[0], "colours": colours, "perFace": False, "faces": faces,
-                          "uvs": uvs})
+                          "uvs": uvs, "normals": normals})
         skinned, bones = f["skin"], f["boneIds"]
     for count, size in zip(counts[1:], (39, 50, 18, 0)):
         b.take(count * size)
@@ -201,8 +202,7 @@ def _renders(b, meshes, n, tail):
     65,536s, every index naming a real vertex and the last mesh ending where the tail begins."""
     width = 4 if n > 0xFFFF else 2
     start = b.i
-    # nearly every model fits the stored counts, and some of those carry an index past the
-    # vertices, so the counts as stored come first and unchecked
+    # the stored counts come first, unchecked
     plain = []
     try:
         for _ in range(meshes):
@@ -264,7 +264,8 @@ def records(root=None, minors=None):
 def mesh(mid, root=None):
     """One model with every part in one vertex list, or None when it does not decode:
     {"verts": [(x, y, z)], "tris": [(a, b, c, material)], "colours": packed hsl per vertex,
-    "uvs": [(u, v)]}. A part coloured per face gives each vertex the colour of its last face."""
+    "uvs": [(u, v)], "normals": [(x, y, z)] as signed bytes}. A part coloured per face gives each
+    vertex the colour of its last face. Normals face as the triangles wind, counter-clockwise."""
     root = root or cachefile.GAME
     files = cachefile.files(MAJOR, mid, root) or {}
     if not files:
@@ -272,12 +273,16 @@ def mesh(mid, root=None):
     out, problem = decode(files[min(files)], mesh=True)
     if problem:
         return None
-    verts, tris, colours, uvs = [], [], [], []
+    verts, tris, colours, uvs, normals = [], [], [], [], []
     for part in out["parts"]:
         base = len(verts)
         p = part["positions"]
         n = len(p) // 3
         verts.extend((p[i], p[i + 1], p[i + 2]) for i in range(0, n * 3, 3))
+        # signed bytes, about 126 long
+        raw = array.array("b", part.get("normals") or b"")
+        normals.extend((raw[i * 3], raw[i * 3 + 1], raw[i * 3 + 2]) if (i + 1) * 3 <= len(raw) else (0, 127, 0)
+                       for i in range(n))
         raw = part.get("uvs") or b""
         # half floats, big endian, u then v
         uvs.extend(struct.unpack_from(">ee", raw, i * 4) if (i + 1) * 4 <= len(raw) else (0.0, 0.0)
@@ -295,7 +300,7 @@ def mesh(mid, root=None):
                         if v < n:
                             mine[v] = cols[k]
         colours.extend(mine)
-    return {"verts": verts, "tris": tris, "colours": colours, "uvs": uvs}
+    return {"verts": verts, "tris": tris, "colours": colours, "uvs": uvs, "normals": normals}
 
 
 def verify(limit=None):

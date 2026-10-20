@@ -45,11 +45,11 @@ Things that are easy to get wrong here:
   and loc quests the required quest ids; both are confirmed.
 - Items past 65535 use the tribyte families: stack1..9, and noteLink/noteTemplate, lentLink,
   boughtLink, shardLink. The old ushort equivalents have zero uses in modern RS3.
-- Shop stock is in inv / inv_stock, decoded from invtype which rsmv cannot read. Nothing anywhere
+- Shop stock is in inv / inv_stock, decoded from invtype. Nothing anywhere
   in the cache links an npc to its shop, or gives a shop a location - that is server side.
 - Sprites carry a name hash, not a name. sprite_name holds the cracked ones, sprite_use holds
   everything that points at a sprite (interface components and params typed SPRITE), sprite_hash
-  holds all 36425 hashes.
+  holds all 36497 hashes.
 """
 
 
@@ -193,9 +193,26 @@ def parents_of(c, t, cid):
     return out
 
 
+def _miss_note(kind, needle):
+    """What an add-on knows about a name the cache has never heard of.
+
+    102 items were renamed after the cache's copy: 48 is Longbow (unstrung) here and Shieldbow
+    (unstrung) in the game. Looked up by the name on screen they returned found: 0, which reads as
+    no such item rather than a name this cache predates.
+    """
+    from rs3mcp import addons
+    for offered in addons.every("lookup_miss"):
+        try:
+            note = offered(kind, needle)
+        except Exception:
+            note = None
+        if note:
+            return note
+    return None
+
+
 def tool_lookup(args):
-    # id= is what every other tool here takes, so accept it rather than raising a KeyError on the
-    # obvious call. name= still takes an id, which is how this was originally written.
+    # id= is what every other tool here takes
     kind = str(args.get("kind") or "").strip().lower()
     if not kind:
         raise ValueError("give a kind: item, npc, loc, struct, enum, iface")
@@ -219,7 +236,7 @@ def tool_lookup(args):
             rows = c.execute("select * from config where type=? and (name like ? or display like ?)"
                              " collate nocase order by id limit 25", (t, like, like)).fetchall()
     if not rows:
-        return {"found": 0, "matches": []}
+        return {"found": 0, "matches": [], "note": _miss_note(t, needle)}
 
     out = []
     for r in rows[:5]:
@@ -233,9 +250,7 @@ def tool_lookup(args):
                 "select p.param_id,t.name,t.valuetype,p.int_value,p.str_value,p.target_name "
                 "from param_use p left join param_type t on t.param_id=p.param_id "
                 "where p.owner_type=? and p.owner_id=? order by p.param_id", (t, r["id"]))]
-        # Multiloc, for npcs as well as locs. A parent config wears a child's look depending on a
-        # var, and the entity in the world carries the PARENT id -- so anything naming the child
-        # matches nothing and says nothing. Both directions are answered here.
+        # multiloc, for npcs as well as locs
         for key in MORPHS:
             if key in d:
                 rec["multiloc"] = decode_morphs(c, t, d[key])
@@ -298,7 +313,7 @@ TOOLS = [
                     "against the RS3 cache database. Call this first.",
      "inputSchema": {"type": "object", "properties": {}}},
     {"name": "rs3_query", "fn": tool_query,
-     "description": "Run a read-only SELECT against the RS3 cache database and get rows as JSON.",
+     "description": "Run a read-only SQL SELECT against the RS3 cache database and get rows as JSON.",
      "inputSchema": {"type": "object", "required": ["sql"], "properties": {
          "sql": {"type": "string", "description": "a single SELECT or WITH statement"},
          "limit": {"type": "integer", "description": "max rows, default 200, cap %d" % MAX_ROWS}}}},

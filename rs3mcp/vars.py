@@ -119,7 +119,7 @@ def _base(c, base_id):
 def _find(c, who):
     who = str(who).strip()
     if who.lstrip("-").isdigit():
-        # VarPlayer first: the two number their ids apart, and varbits only live in VarPlayers
+        # VarPlayer first: varbits only live in VarPlayers
         return c.execute("select type,id,name from config where type in ('VarPlayer','VarClient') "
                          "and id=? order by type desc", (int(who),)).fetchall()
     rows = c.execute("select type,id,name from config where type in ('VarPlayer','VarClient') "
@@ -213,9 +213,7 @@ def tool_var(args):
                         "startsAt": qv.get("start"), "completeAt": qv.get("complete"),
                         "progressVar": qv.get("var")}
     else:
-        # Only the progression var is in the quest table, and most quest state is not on it.
-        # OBSERVATORY_STARSIGN names its quest outright and matched nothing here. Imported late:
-        # quests reaches back into this module.
+        # only the progression var is in the table
         try:
             from . import addons
             quest_var = addons.first("quest_var")
@@ -224,8 +222,7 @@ def tool_var(args):
             alt = None
         hit = ((alt or {}).get("quests") or [None])[0]
         if hit:
-            # possibleQuest, not quest. A short config name swallows what it does not own.
-            # You Are It is configured TRAIL, and every globetrotter TRAIL_OUTFIT var matched it.
+            # possibleQuest, since a short name swallows others
             out["possibleQuest"] = {
                 "title": hit.get("title"), "config": hit.get("configName"),
                 "matchedBy": "the quest config as a name prefix, not the var that tracks it",

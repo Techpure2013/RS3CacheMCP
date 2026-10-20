@@ -166,7 +166,7 @@ class _Parser:
             while self.peek() != "}":
                 ftype = self.shape()
                 name = self.take()
-                # `u16 from -> materials` reads better than `u16 -> materials from`, so both work
+                # the from clause reads either way round
                 if self.peek() == "->":
                     self.take("->")
                     ftype = ("ref", self.take(), ftype)
@@ -222,7 +222,7 @@ def parse(text, source="spec"):
                 spec[head] = value if head in ("type", "layout") else int(value, 0)
                 continue
             if head == "record":
-                # the rest of the file is one shape, read once for the whole record
+                # the rest of the file is one shape
                 body = [rest] + [r.partition("#")[0] for r in lines[n:]]
                 spec["record"] = parse_shape(" ".join(body))
                 break
@@ -422,7 +422,7 @@ def read(node, buf, scope):
             n = max(0, n)
         else:
             n = read(how, buf, scope)
-        # a count past the bytes left cannot be real, and trying it is how a wrong shape hangs
+        # a count past the bytes left is wrong
         if n > len(buf.b) - buf.i:
             raise Stop("a count of %d with %d bytes left" % (n, len(buf.b) - buf.i))
         return [read(node[2], buf, scope) for _ in range(n)]
@@ -488,12 +488,12 @@ def records(spec, root=None, minors=None):
     if not desc:
         return
     layout = spec.get("layout", "chunked")
-    # from the whole index: a part of it can have a smaller highest file id
+    # from the whole index, not a part
     size = cachefile.chunk(desc) if layout == "chunked" else None
     if minors is not None:
         desc = {m: desc[m] for m in minors if m in desc}
     if spec["group"] is not None:
-        # one group holds the whole type and the file id is the config id
+        # one group holds the whole type
         files = cachefile.files(spec["index"], spec["group"], root, desc) or {}
         for fid in sorted(files):
             yield fid, files[fid]
@@ -502,7 +502,7 @@ def records(spec, root=None, minors=None):
         files = cachefile.files(spec["index"], minor, root, desc) or {}
         for fid in sorted(files):
             if layout == "groups":
-                # a group is one record, and its id is the group
+                # a group is one record, keyed by group
                 yield minor, files[fid]
             elif layout == "files":
                 yield (minor << 16) | fid, files[fid]

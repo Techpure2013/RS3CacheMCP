@@ -1,5 +1,7 @@
 # objects, the locs: every opcode today's cache uses.
 # unkXX is a field we can read and cannot name yet.
+# Lines marked beta are the beta client's cache (RuneScape-BETA), checked 2026-09-25: every record
+# decodes, and each one live also holds reads the same value both ways.
 
 type objects
 index 16
@@ -16,7 +18,7 @@ index 16
 0x17 clipped         true
 0x18 animation       varu32 -> sequences
 0x1B unk1B           true
-0x1C decorOffset     u8
+0x1C unk1C           u8                          # was decorOffset, which 0xA7 turned out to be. Wall shapes 0-3 and 9; the client reads 0 for groundDecorOffset on nearly every loc carrying it
 0x1D ambient         i8
 0x1E option1         string
 0x1F option2         string
@@ -40,21 +42,23 @@ index 16
 0x49 obstructsGround true
 0x4A hollow          true
 0x4B supportsItems   u8
+0x4D morphs          {u32 var -> vars; list[varu16]<varu32 -> objects> ids; varu32 fallback -> objects} # beta: 0xCF without the flags byte
 0x4E sound           {u16 id; u8 range}
 0x4F randomSounds    {u16 min; u16 max; u8 range; list[u8]<u16> ids}
 0x51 groundContour   u8
 0x52 unk52           true
 0x58 unk58           true
-0x59 unk59           true
+0x59 randomAnimationFrame false          # useRandomAnimationFrame on all 2,003 carrying it, absent on every other
 0x5B members         true
+0x5C morphsWide      {u32 var -> vars; varu32 fallback -> objects; list[varu16]<varu32 -> objects> ids; varu32 unk -> objects} # beta: 0xD0 without the flags byte
 0x5D unk5D           {i8 a; i8 b}
 0x5E unk5E           true
 0x5F unk5F           i16
 0x61 unk61           true
 0x62 unk62           true
 0x66 mapscene        u16 -> mapscenes
-0x67 unk67           true
-0x68 unk68           u8
+0x67 occludes        false                       # rsmv's occludes_2 on the same 112k records
+0x68 unk68           u8                          # on sounding locs (6170 of 6211); 50/100/150, maybe volume
 0x6A headModels      list<{varu32 model -> models; u8 unk}>
 0x6B mapFunction     u16
 0x6C unk6C           true
@@ -68,19 +72,19 @@ index 16
 0x9A memberOption5   string
 0xA0 quests          list<u16 -> quests>
 0xA2 unkA2           i32
-0xA3 unkA3           {i8 a; i8 b; i8 c; i8 d}
+0xA3 unkA3           {i8 a; i8 b; i8 c; i8 d}    # names say 'darker'; same shape as npcs 0x9B, a tint?
 0xA4 unkA4           i16
 0xA5 unkA5           i16
 0xA6 unkA6           u16
-0xA7 unkA7           u16
+0xA7 groundDecorOffset u16                 # the client's groundDecorOffset exactly, on all 3,030; nearly all are shape 22
 0xAA unkAA           varu16
 0xAB unkAB           varu16
-0xAD unkAD           {u16 a; u16 b}
+0xAD unkAD           {u16 a; u16 b}              # on sounding locs (3179 of 3187); a <= b always, 86% span 256, maybe a rate range
 0xB1 unkB1           true
-0xB2 unkB2           u8
+0xB2 unkB2           u8                          # on sounding locs (1603 of 1603); 5/8/10
 0xBA unkBA           u8
 0xBC unkBC           true
-0xBD unkBD           true
+0xBD unkBD           true                        # trees, ivy and canopies
 0xBE cursor1         u16
 0xBF cursor2         u16
 0xC0 cursor3         u16
@@ -88,12 +92,13 @@ index 16
 0xC2 cursor5         u16
 0xC4 unkC4           u8
 0xC5 unkC5           u8
-0xC6 unkC6           true
+0xC6 unkC6           true                        # mostly bgsound/randomsound locs (2253 of 3082)
 0xC7 unkC7           true
-0xC9 unkC9           {vari16 a; vari16 b; vari16 c; vari16 d; vari16 e; vari16 f}
+0xC9 customBounding  {vari16 a; vari16 b; vari16 c; vari16 d; vari16 e; vari16 f} # hasCustomBounding true on all 136 carrying it and false on every other. Same shape as npcs 0xB3
 0xCA unkCA           u8
-0xCB unkCB           true
-0xCC unkCC           list[u8]<bytes[27]>
+0xCB fastPicking     false                       # clickzones, obstacles and gfx helpers; fastPicking false on 230 of the 231, loc 24264 Hole the exception
+0xCC unkCC           list[u8]<bytes[27]>         # torches, fireplaces, candles, vfx; light sources?
+0xCD modelMorphs     {u16 _size; u32 var -> vars; u8 flags; list[u8]<{u8 value; list[u8]<{u16 a; u16 b; varu32 model -> models}> models}> sets; u16 fallback} # beta: 0xD1 without its unk byte
 0xCE unkCE           list[u16]<u8>
 0xCF morphs          {u8 _flags; u32 var -> vars; list[varu16]<varu32 -> objects> ids; varu32 fallback -> objects}
 0xD0 morphsWide      {u8 _flags; u32 var -> vars; varu32 fallback -> objects; list[varu16]<varu32 -> objects> ids; varu32 unk -> objects}

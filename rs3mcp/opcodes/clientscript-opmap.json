@@ -1,5 +1,6 @@
 {
 "build": 940,
+"calibrated": "2026-10-08",
 "ops": {
 "0": {
 "imm": "byte",
@@ -19747,5 +19748,5 @@
 }
 }
 },
-"seed": "rsmv calibration of this update, the chain starts here"
+"seed": "the first calibration, the chain starts here"
 }

@@ -8,7 +8,7 @@ it in rs3-index.db. Every reader falls back to the slow path when the sidecar is
 means a stale or absent index degrades speed and never correctness.
 
 What it fixes: _item_family answered "who links to this item" with `data LIKE '%"noteLink":6,%'`
-once per field per suffix, sixteen full scans of 63,414 rows carrying JSON. That was 1.1 seconds on
+once per field per suffix, sixteen full scans of 63,530 rows carrying JSON. That was 1.1 seconds on
 every rs3_trace call. Precomputed it is a keyed lookup.
 """
 import io
@@ -28,7 +28,7 @@ CACHE = os.path.join(ROOT, "rs3-cache.db")
 INDEX = os.path.join(ROOT, "rs3-index.db")
 
 ITEM_LINK_FIELDS = ["noteLink", "noteTemplate", "lentLink", "lentTemplate",
-                    "boughtLink", "boughtTemplate", "shardLink", "shardTemplate"]
+                    "boughtLink", "boughtTemplate", "shardLink", "shardTemplate", "recipeTemplate"]
 
 
 def build():
@@ -37,9 +37,7 @@ def build():
     t0 = time.time()
     src = sqlite3.connect("file:" + CACHE.replace("\\", "/") + "?mode=ro", uri=True)
     src.row_factory = sqlite3.Row
-    # Built beside the live one and moved over at the end. Deleting first left every query on its
-    # slow path for the whole build, which from outside looks the same as broken. os.replace is
-    # atomic, so a reader holds the old file or the new one and never half of either.
+    # built beside the live one, then moved over
     staging = INDEX + ".new"
     if os.path.exists(staging):
         os.remove(staging)
@@ -69,7 +67,7 @@ def build():
         dst.executemany("insert into item_link values (?,?,?,?,?)", batch)
         rows += len(batch)
 
-    # morph edges: which parent wears which child as an appearance, for npcs and locs
+    # morph edges: which parent wears which child
     dst.execute("create table morph_edge (type text, parent_id integer, child_id integer, "
                 "slot text)")
     from rs3mcp.cache import MORPHS, morph_children, NONE_CHILD
@@ -107,7 +105,7 @@ def build():
 
     dst.execute("create index il_target on item_link (target_id, field)")
     dst.execute("create index il_owner on item_link (owner_id)")
-    # clientscript token postings: token -> the files containing it
+    # clientscript token postings: token to its files
     dst.execute("create table script_token (token text, file_id integer)")
     dst.execute("create table script_file (file_id integer primary key, name text)")
     ntok = 0
@@ -141,9 +139,7 @@ def build():
     dst.execute("insert into meta values ('item_link_rows', ?)", (str(rows),))
     dst.execute("insert into meta values ('morph_edge_rows', ?)", (str(medges),))
     dst.execute("insert into meta values ('script_token_rows', ?)", (str(ntok),))
-    # The references go in before the swap, not after. Building them into the live file meant a
-    # window where the index existed but had no script_ref table in it, which readers probing that
-    # table saw as a broken index rather than as a rebuild in progress. One swap, everything ready.
+    # the references go in before the swap
     build_script_refs(dst)
     dst.commit()
     dst.close()
@@ -182,9 +178,7 @@ def _swap_in(staging, tries=5):
 
 # --------------------------------------------------------------------------- script references
 #
-# The decompiler types its constants, so a reference can be extracted exactly instead of matched as
-# text. `varbitplayer_44763` is a varbit and nothing else; the bare number 44763 is a coordinate as
-# often as not.
+# the decompiler types its constants, so extract exactly
 CLIENTSCRIPT = os.path.join(ROOT, "rs3-cache-stage", "clientscript")
 
 REF_VAR = re.compile(r"\bvar(bitplayer|player|client)_(\d+)\b")
@@ -193,7 +187,7 @@ REF_COMP = re.compile(r"\bcomp\(\s*(\d+)\s*,\s*(\d+)\s*\)")
 REF_CALL = re.compile(r"\bscript(\d+)\s*\(")
 
 VAR_KIND = {"bitplayer": "varbit", "player": "varp", "client": "varclient"}
-# the typed names worth indexing; the rest are counts, colours and flags
+# the typed names worth indexing, not the counts
 TYPED_KEEP = {"obj", "npc", "loc", "seq", "struct", "inv", "quest", "model", "dbrow",
               "cursor", "achievement", "graphic", "stat", "cs"}
 

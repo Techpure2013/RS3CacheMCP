@@ -6,24 +6,24 @@ index 20
 
 0x01 frames          {u16 _n; list[_n]<u16> durations; list[_n]<u16> files; list[_n]<u16> groups}
 0x02 loopOffset      u16
-0x05 unk05           u8
+0x05 priority        u8                          # client default 5; 11 of 7467 read 5 in the harvest
 0x06 leftHand        u16
 0x07 rightHand       u16
 0x08 maxLoops        u8
-0x09 unk09           u8
-0x0A unk0A           u8
-0x0B unk0B           u8
+0x09 preAnimMove     u8                          # the client's value on 2,878 of 2,885. 0x18 sets it too, on 1,691 more
+0x0A postAnimMove    u8                          # the client's value on 4,350 of 4,358. 0x18 sets it too
+0x0B animDuplicateBehaviour u8                   # 2,605 of 2,610, and the client reads 2 on every sequence without it
 0x0D sounds          list[u16]<{u8 _n; u16 first if _n!=0; u8 unk if _n!=0; list[_n-1]<u16> rest}>
 0x0E unk0E           true
 0x0F unk0F           true
-0x10 unk10           true
+0x10 unk10           true                        # mill sails, animated grass, a sawmill: world loops
 0x12 unk12           true
 0x16 unk16           u8
 0x18 unk18           u16
 0x19 skeletal        u16
 0x1A skeletalRange   {u16 start; u16 end}
 0x1B unk1B           u8
-0x70 unk70           {u16 _n; list[_n]<u16> a; list[_n]<u16> b}
+0x70 unk70           {u16 _n; list[_n]<u16> a; list[_n]<u16> b} # chathead expressions only
 0x77 unk77           {u16 a; u8 b}
 0x78 unk78           {u16 a; u16 b; u16 c}
 0xF9 params          params

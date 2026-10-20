@@ -14,8 +14,7 @@ import re
 from . import maplocs
 
 SURFACE_BLOCK = 256
-# the whole overworld in 34 boxes, which would swallow every loc outside a town. It is the only
-# catch-all zone, and its boxes are smaller than some real areas, so it goes by name.
+# the overworld zone goes by name, not box
 CATCHALL = {"RuneScape Surface"}
 
 

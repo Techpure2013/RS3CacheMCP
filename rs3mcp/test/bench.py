@@ -28,7 +28,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from rs3mcp.common import registry  # noqa
 from rs3mcp.test import latency  # noqa
 
-# tools that reach the network or write something, and should not be hammered
+# tools that reach out, not to be hammered
 NETWORK = {"rs3_wiki", "rs3_db", "rs3_db_query", "rs3_db_where", "rs3_crosscheck", "rs3_drift"}
 
 

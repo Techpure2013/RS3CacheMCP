@@ -29,7 +29,7 @@ I, L, S = "int", "long", "string"
 STRING_TYPES = {36, 50}
 LONG_TYPES = {35, 49, 56, 71, 110, 115, 116}
 
-# var domains, as the top byte of a var immediate carries them, and the config page of each
+# var domains, off an immediate's top byte
 VAR_PAGES = {0: "varplayer", 1: "varnpc", 2: "varclient", 3: "varworld", 4: "varregion",
              5: "varobject", 6: "varclan", 7: "varclansettings", 9: "varplayergroup"}
 
@@ -37,18 +37,18 @@ OP = dict(
     jump=6, branch_not=7, branch_eq=8, branch_lt=9, branch_gt=10, branch_lteq=31, branch_gteq=32,
     ret=21, switch=51, push_int_local=33, pop_int_local=34, push_string_local=35,
     pop_string_local=36, push_long_local=10024, pop_long_local=10237, join=37, gosub=40,
-    # varbits pack their id like vars do, id << 8; the plain 10022/10023 never occur
+    # varbits pack their id like vars do
     push_var=42, pop_var=43, push_varbit=10982, pop_varbit=10983, push_array=45, pop_array=46,
     define_array=10569, const=9001, discard_int=10004, discard_long=9104, discard_string=10360,
     enum=3408, db_getfield=10094, db_find=10113, db_find_with_count=10100, cc_setparam=10098,
-    # UNKNOWN_COMMAND_733: a db find with two ints after the value, pushing one
+    # UNKNOWN_COMMAND_733: a db find pushing one value
     db_find_733=10257,
 )
 LONG_BRANCHES = {10153, 10449, 10411, 10321, 10491, 10349}
 STEPS = {op for op, name in cs.names().items() if name in ("ADD", "SUB")}
 INT_BRANCHES = {OP["branch_not"], OP["branch_eq"], OP["branch_lt"], OP["branch_gt"],
                 OP["branch_lteq"], OP["branch_gteq"]}
-# a read of a param off something: the thing, then the param id
+# a param read: the thing, then the id
 GETPARAM = {4500, 4208, 10262, 10076, 10049, 10192}
 CC_PARAM = 10049
 
@@ -65,9 +65,9 @@ class Context:
         self.opmap = {int(k): (v["op"], v["imm"]) for k, v in raw.items()}
         self.fixed = {v["op"]: (v["in"], v["out"]) for v in raw.values()
                       if v["in"] is not None and not v.get("inferred")}
-        # effects infer() worked out, kept apart so a later run can still move them
+        # effects infer() worked out, kept apart
         self.guess = {v["op"]: (v["in"], v["out"]) for v in raw.values() if v.get("inferred")}
-        # every hook setter has the shape of its family: the IF ones name a component after
+        # every hook setter has its family's shape
         names = cs.names()
         for v in raw.values():
             name = names.get(v["op"], "")
@@ -94,7 +94,7 @@ class Context:
             head = cs.read(data, self.opmap)
             self.code[sid] = head.pop("code")
             self.heads[sid] = head
-        # what each script leaves for its caller, filled in as scripts are simulated
+        # what each script leaves for its caller
         self.returns = {}
 
 
@@ -161,7 +161,7 @@ def effect(ctx, op, imm, stack):
         pid = top(I)
         if pid is None:
             raise Stuck("param not constant")
-        # a CC op works on the component the script is on, so only the param is on the stack
+        # a CC op works on the current component
         return [I] if op == CC_PARAM else [I, I], [prim(ctx.params.get(pid, 0))]
     if op == OP["enum"]:
         vtype = top(I, 2)
@@ -175,13 +175,13 @@ def effect(ctx, op, imm, stack):
         types = ctx.columns.get((col >> 12, (col >> 4) & 0xFF))
         if types is None:
             raise Wrong("db column %d names no column" % col)
-        # the low nibble picks one value out of the column's tuple, counting from 1; 0 is all
+        # the low nibble picks one tuple value
         pick = col & 0xF
         if pick:
             types = types[pick - 1:pick]
         return [I, I, I], [prim(t) for t in types]
     if op in (OP["db_find"], OP["db_find_with_count"], OP["db_find_733"]):
-        # the column, a value of the column's type, which may be on another stack, then ints
+        # the column, a value of its type, ints
         pushes = [] if op == OP["db_find"] else [I]
         tail = [I, I] if op == OP["db_find_733"] else [I]
         for kind in (S, I, L):
@@ -346,8 +346,7 @@ def settle(ctx, samples=None, dirty=None):
     done = set()
 
     def run(sid):
-        # depths only count from a script that simulates, so a guess gone wrong earlier in
-        # the same script cannot drag a count down
+        # depths only count from a script that simulates
         seen = collections.defaultdict(list) if samples is not None else None
         try:
             ctx.returns[sid] = simulate(ctx, sid, seen)[1]
@@ -371,8 +370,7 @@ def settle(ctx, samples=None, dirty=None):
             left[c] -= 1
             if left[c] == 0:
                 queue.append(c)
-    # scripts in a call cycle: guess they return nothing, then take what they really return,
-    # until no guess changes
+    # a call cycle: guess nothing, then take returns
     cycle = sorted(set(ctx.code) - done)
     for sid in cycle:
         ctx.returns.setdefault(sid, ())
@@ -471,7 +469,7 @@ def infer(ctx, rounds=8, say=None):
         wrong, stuck = settle(ctx)
         if say:
             say("round: %d solved, %d wrong, %d stuck" % (solved, len(wrong), len(stuck)))
-        # a script in a call cycle can be solved again every round and still fail
+        # a cycled script can solve again and fail
         if last == (set(wrong), set(stuck)):
             break
         last = (set(wrong), set(stuck))
@@ -483,7 +481,7 @@ def infer(ctx, rounds=8, say=None):
 def trim(ctx, say=None):
     """Drop a value a seeded effect carries through, where a script proves the op never had it.
 
-    rsmv's map can have an op take and give back one more value of a kind than it really does.
+    A seeded map can have an op take and give back one more value of a kind than it really does.
     Nested inside a bigger expression the two look the same; at the start of a statement the op
     pops a stack that is empty. The trim stays only if no script goes wrong that did not before."""
     wrong, _ = settled(ctx)
@@ -502,7 +500,7 @@ def trim(ctx, say=None):
             pushes.remove(kind)
             fixed = ctx.fixed.pop(op, None)
             ctx.guess[op] = (pops, pushes)
-            # the script that asked for it has to stop failing on it, which one simulation tells
+            # the script that asked has to stop failing
             try:
                 simulate(ctx, sid)
                 still = False
@@ -515,7 +513,7 @@ def trim(ctx, say=None):
                 else:
                     ctx.guess[op] = got
                 continue
-            # settling only changes returns, so putting them back undoes it exactly
+            # settling only changes returns, so putting back undoes
             before = (dict(ctx.returns), settled(ctx))
             now, _ = settle(ctx)
             if len(now) < len(wrong) and not set(now) - set(wrong):
@@ -549,7 +547,7 @@ def guess_rest(ctx, say=None):
     wrong, before = was, len(was) + len(stuck)
     for op, (pops, pushes) in got.items():
         ctx.guess[op] = (list(pops), list(pushes))
-    # a guess in a script that went wrong with the guesses goes, until none do
+    # a guess that went wrong with them goes
     while got:
         wrong, stuck = settle(ctx)
         bad = {op for sid in set(wrong) - set(was) for op, _ in ctx.code[sid]} & set(got)
@@ -590,7 +588,7 @@ def _replay(ctx, sid, code, i, b, unknown, names, stack, mark, cast, budget):
     for i in range(i, b + 1):
         op, imm = code[i]
         if op == OP["ret"]:
-            # a script nothing has settled yet most likely returns nothing
+            # an unsettled script most likely returns nothing
             want = _vec(ctx.returns.get(sid, ()))
             return cast if want == _vec([k for k, _ in stack]) else None
         if i in unknown:
@@ -621,7 +619,7 @@ def _replay(ctx, sid, code, i, b, unknown, names, stack, mark, cast, budget):
         try:
             pops, pushes = effect(ctx, op, imm, stack)
         except Stuck:
-            # the stacks were empty, so a statement could have ended there
+            # the stacks were empty, so a statement ended
             return cast if not stack and cast else None
         except Wrong:
             return None
@@ -684,7 +682,7 @@ def _statements(ctx, sid, code, nets, depths):
             n = len(unknown)
             if clean and not unknown and sid not in ctx.returns:
                 nets[("ret", sid)][tuple(total)] += 1
-            # what the script returns is known, so the unknown in front made up the difference
+            # the returns are known, so the unknown balances
             elif clean and n and len(set(unknown)) == 1 and sid in ctx.returns \
                     and unknown[0] != ("ret", sid):
                 left = [r - t for r, t in zip(_vec(ctx.returns[sid]), total)]
@@ -703,7 +701,7 @@ def _statements(ctx, sid, code, nets, depths):
             elif str(e).startswith("no effect") and not _hooklike(ctx, stack):
                 pops, pushes, key = [], [], ("op", op)
             else:
-                # a hook setter's pops hang on its signature, which no single count fits
+                # a hook setter's pops hang on its signature
                 pops, pushes, clean = [], [], False
         except Wrong:
             pops, pushes, clean = [], [], False
@@ -719,15 +717,15 @@ def _statements(ctx, sid, code, nets, depths):
         for kind in pushes:
             total[(I, L, S).index(kind)] += 1
             stack.append((kind, imm[1] if op == OP["const"] else None))
-        # `x, y = f()` stores into several locals in a row, and the statement ends at the last
+        # several locals stored in a row, ending last
         if op in ASSIGNS and i + 1 < len(code) and code[i + 1][0] in ASSIGNS or _postfix(code, i):
             continue
         if op in SINKS or (key is None and not pushes):
-            # one unknown, maybe several times over: SPLINE_ADDPOINT comes in runs
+            # one unknown, maybe several times over
             n = len(unknown)
             if clean and n and len(set(unknown)) == 1 and all(x % n == 0 for x in total):
                 net = tuple(-x // n for x in total)
-                # an op cannot take more than was in front of it
+                # an op cannot take more than preceded it
                 if first is None or all(-x <= d for x, d in zip(net, first)):
                     nets[unknown[0]][net] += 1
             stack, total, unknown, clean = [], [0, 0, 0], [], True

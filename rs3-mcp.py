@@ -25,7 +25,8 @@ family is an import here and nothing else.
 Tools that only mean something in one workspace live in add-on packages beside rs3mcp and are added
 to these at start. See rs3mcp/addons.py.
 
-Run standalone to sanity check it:  python rs3-mcp.py --selftest
+Run standalone to sanity check it:  python rs3-mcp.py --selftest   (unchanged tests skipped)
+Every test, changed or not:         python rs3-mcp.py --selftest --full
 Known-answer tests only:            python rs3-mcp.py --test
 Record every tool's answer:         python rs3-mcp.py --golden
 Diff against it after a change:     python rs3-mcp.py --diff
@@ -42,14 +43,18 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from rs3mcp import addons, common
+from rs3mcp import gateway
 from rs3mcp import howto
 from rs3mcp import resources
-from rs3mcp import (cache, families, cachediff, drift, scriptrefs, dbtable, iface, script, trace, vars,
-                    wiki)
+from rs3mcp import (cache, collision, families, cachediff, drift, research, scriptrefs, dbtable, iface,
+                    script, trace, vars, wiki)
 
-PROTOCOL = "2025-06-18"
+PROTOCOL = "2025-11-25"
+# legacy versions answered, newest first
+SPOKEN = (PROTOCOL, "2025-06-18", "2025-03-26", "2024-11-05")
 
-FAMILIES = [cache, families, trace, cachediff, scriptrefs, script, vars, dbtable, iface, wiki, drift]
+FAMILIES = [cache, families, trace, cachediff, scriptrefs, script, vars, dbtable, iface, wiki, drift,
+            research, collision]
 FAMILIES += addons.families()
 
 TOOLS = []
@@ -57,6 +62,9 @@ for _mod in FAMILIES:
     TOOLS.extend(_mod.TOOLS)
 
 BY_NAME = {t["name"]: t for t in TOOLS}
+# find, how and run, listed only when compact
+GATEWAY = {t["name"]: t for t in gateway.TOOLS}
+gateway.bind(TOOLS, BY_NAME, howto._all_flows())
 
 # Toolsets, after github-mcp-server, which groups its tools so a client lists only the ones it
 # needs. The listing is paid once a session whether or not a tool is called, and 49 of them is
@@ -69,7 +77,7 @@ SETS = {
     "docs": ("wiki",),
     "scripts": ("script", "scriptrefs"),
     "game": ("vars", "iface", "dbtable"),
-    "meta": ("howto", "drift"),
+    "meta": ("howto", "drift", "research"),
 }
 for _extra in addons.every("toolsets"):
     for _name, _mods in _extra.items():
@@ -89,22 +97,33 @@ def toolset_of(tool):
 
 TOOLSET_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".rs3-toolsets")
 
+# named groups of sets and tools
+PROFILES = {
+    "full": ("all",),
+    "general": ("flow", "comments", "rs3_zone_show", "rs3_handover", "rs3_library", "rs3_library_add"),
+}
+COMPACT = "compact"
+
 
 def wanted_sets():
-    """Sets to list. Unset means all of them, so nothing changes by default.
+    """Set, tool and profile words to list, profiles expanded. None means everything.
 
-    A file beside the server before the environment, because the sets change per task and the
-    environment is fixed when the client launches us. One line to edit, then restart.
+    The environment first, so a project's own MCP config picks its profile; then the file beside
+    the server, one line to edit and restart.
     """
-    raw = ""
-    try:
-        raw = io.open(TOOLSET_FILE, encoding="utf-8").read()
-    except OSError:
-        raw = os.environ.get("RS3_TOOLSETS") or ""
+    raw = os.environ.get("RS3_TOOLSETS") or ""
+    if not raw.strip():
+        try:
+            raw = io.open(TOOLSET_FILE, encoding="utf-8").read()
+        except OSError:
+            raw = ""
     raw = " ".join(l for l in raw.splitlines() if not l.strip().startswith("#")).strip()
-    if not raw or raw.lower() == "all":
+    words = set()
+    for w in raw.replace(",", " ").split():
+        words.update(PROFILES.get(w.lower(), (w.lower(),)))
+    if not words or "all" in words:
         return None
-    return {x.strip().lower() for x in raw.replace(",", " ").split() if x.strip()}
+    return words
 
 
 # Tool annotations, from the 2025-06-18 schema. Almost everything here reads the cache and
@@ -112,6 +131,7 @@ def wanted_sets():
 # the default below. A wrong readOnlyHint is a safety claim that is false, hence a list.
 SIDE_EFFECTS = {
     "rs3_wiki": {"readOnlyHint": True, "openWorldHint": True},
+    "rs3_research": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True},
 }
 # an add-on names its own writers, since it is the one that knows
 for _extra in addons.every("side_effects"):
@@ -127,8 +147,9 @@ def listing():
     """
     keep = wanted_sets()
     out = []
-    for t in TOOLS:
-        if keep is not None and toolset_of(t) not in keep:
+    listed = list(GATEWAY.values()) + TOOLS if keep and COMPACT in keep else TOOLS
+    for t in listed:
+        if keep is not None and t["name"] not in GATEWAY and toolset_of(t) not in keep and t["name"] not in keep:
             continue
         rec = {k: t[k] for k in ("name", "description", "inputSchema")}
         rec["annotations"] = SIDE_EFFECTS.get(t["name"], READS_ONLY)
@@ -223,15 +244,19 @@ class NoSuchResource(LookupError):
     """
 
 
+class UnknownTool(LookupError):
+    """A tools/call naming no tool. -32602, a protocol error in the spec rather than isError."""
+
+
 def handle(req):
     method = req.get("method")
     if method == "initialize":
-        ver = (req.get("params") or {}).get("protocolVersion") or PROTOCOL
-        return {"protocolVersion": ver,
+        ver = (req.get("params") or {}).get("protocolVersion")
+        return {"protocolVersion": ver if ver in SPOKEN else PROTOCOL,
                 # resources declares neither subscribe nor listChanged: nothing here changes
                 # under a running session except the files, and we do not watch them.
                 "capabilities": {"tools": {}, "resources": {}},
-                "instructions": howto.instructions(),
+                "instructions": howto.instructions(compact=COMPACT in (wanted_sets() or ())),
                 "serverInfo": {"name": "rs3cache", "version": "2.0.0"}}
     if method == "tools/list":
         return {"tools": listing()}
@@ -249,12 +274,13 @@ def handle(req):
     if method == "tools/call":
         p = req.get("params") or {}
         name = p.get("name")
-        t = BY_NAME.get(name)
-        if t is None:
-            return {"content": [{"type": "text", "text": "no tool called " + str(name)}],
-                    "isError": True}
+        call = p.get("arguments") or {}
+        if name == "rs3_run":
+            name, call = call.get("tool"), call.get("args") or {}
+        t = BY_NAME.get(name) or GATEWAY.get(name)
+        if t is None or name == "rs3_run":
+            raise UnknownTool(name)
         try:
-            call = p.get("arguments") or {}
             ours = (SPILL_ARG, PICK_ARG)
             got = lean(t["fn"]({k: v for k, v in call.items() if k not in ours}))
             if call.get(PICK_ARG):
@@ -375,6 +401,12 @@ def main():
     if len(sys.argv) > 1:
         sys.exit(from_shell(sys.argv[1:]))
 
+    # protocol gets a private stdout, the rest stderr
+    wire = os.fdopen(os.dup(1), "w", encoding="utf-8", newline="\n")
+    sys.stdout.flush()
+    os.dup2(2, 1)
+    sys.stdout = sys.stderr
+
     from rs3mcp import bypass, journal, poollog
     journal.serve([{"name": t["name"], "set": toolset_of(t)} for t in TOOLS], bypass.advise)
     # apps other than Claude Code leave no transcript, so the pool reads what this server saw
@@ -386,7 +418,10 @@ def main():
             continue
         try:
             req = json.loads(line)
-        except Exception:
+        except ValueError:
+            wire.write(json.dumps({"jsonrpc": "2.0", "id": None, "error": {
+                "code": -32700, "message": "Parse error"}}, separators=WIRE) + "\n")
+            wire.flush()
             continue
         # notifications carry no id and must not be answered
         if "id" not in req:
@@ -406,6 +441,9 @@ def main():
             body = {"jsonrpc": "2.0", "id": req["id"],
                     "error": {"code": -32002, "message": "Resource not found",
                               "data": {"uri": str(e)}}}
+        except UnknownTool as e:
+            body = {"jsonrpc": "2.0", "id": req["id"],
+                    "error": {"code": -32602, "message": "Unknown tool: %s" % e}}
         except LookupError as e:
             body = {"jsonrpc": "2.0", "id": req["id"],
                     "error": {"code": -32601, "message": "method not found: %s" % e}}
@@ -414,8 +452,8 @@ def main():
                     "error": {"code": -32603, "message": str(e)}}
         if call_id and "error" in body:
             log.result(call_id, body["error"]["message"], True)
-        sys.stdout.write(json.dumps(body, separators=WIRE) + "\n")
-        sys.stdout.flush()
+        wire.write(json.dumps(body, separators=WIRE) + "\n")
+        wire.flush()
 
 
 if __name__ == "__main__":

@@ -29,10 +29,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, ROOT)
 from rs3mcp import addons, common  # noqa
 
-# One question per tool, chosen to exercise the parsing rather than the plumbing. A third item names
-# what the answer reads beyond the database (test/workspace.py); without it the call is skipped, since
-# the answer would only record that this machine lacks it. An add-on offers the calls for its own
-# tools under "golden_calls".
+# one question per tool, exercising the parsing
 CALLS = [
     ("rs3_schema", {}, "name lists"),
     ("rs3_dbtable", {"id": "66", "rows": "true", "limit": 4}, "name lists"),
@@ -62,12 +59,11 @@ CALLS = [
     ("rs3_script_refs", {"kind": "varbit", "id": "27169"}),
 ]
 
-# A tool with no baseline is a tool whose answer can change without anyone seeing the diff. Same
-# rule as the soak and the latency harness: driven here, or named with a reason. An add-on names
-# its own under "no_baseline".
+# driven here, or named with a reason
 NO_BASELINE = {
     "rs3_drift": "its own result is the pass count of these checks, so it moves whenever a claim "
                  "is added -- which is the intended behaviour, not a regression",
+    "rs3_research": "fetches pages and keeps findings, so an answer depends on what was stored",
 }
 
 
@@ -83,12 +79,10 @@ def _no_baseline():
     return out
 
 
-# Fields that move on their own and say nothing about correctness. countedHoursAgo is the age of
-# the cached counts, so it moves every run, and a baseline that always differs is one nobody reads.
-# live, liveDumps and fromLiveDumps move whenever a new interface dump is taken.
+# fields that move on their own, meaning nothing
 VOLATILE = re.compile(r"^(path|target|store|store_path|cachedPages|knownMissing|fetched|"
                       r"generatedSkipped|countedHoursAgo|live|liveDumps|fromLiveDumps)$")
-# The same age is spelled out in that tool's note, so the sentence carrying it goes too.
+# the sentence carrying the same age goes too
 AGED = re.compile(r"\s*Counts are exact but were taken [\d.]+ hours ago[^.]*\.")
 PATHY = re.compile(r"[A-Za-z]:[\\/][^\"]*")
 
@@ -206,7 +200,7 @@ def record():
         io.open(os.path.join(where[k], k + ".json"), "w", encoding="utf-8", newline="\n").write(
             json.dumps(v, indent=1, ensure_ascii=False, sort_keys=True, default=str))
     print("recorded %d baselines to %s" % (len(got), ", ".join(sorted({where[k] for k in got}))))
-    # a skipped call keeps whatever baseline it had, so recording here cannot erase another machine's
+    # a skipped call keeps whatever baseline it had
     _say_skipped(skipped)
     return 0
 

@@ -73,7 +73,7 @@ index 19
 0xA8 unkA8           true
 0xB2 unkB2           true
 0xB5 value           {i32 high; i32 low}
-0xB6 unkB6           u24
+0xB6 recipeTemplate  u24 -> items                # 61878, TEMPLATE_FOR_CONSTRUCTION_RECIPE to the client
 0xBE stack1          {u24 item -> items; u16 count}
 0xBF stack2          {u24 item -> items; u16 count}
 0xC0 stack3          {u24 item -> items; u16 count}

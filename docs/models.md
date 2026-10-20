@@ -33,11 +33,11 @@ That's the wolf. Its box is 262 x 575 x 1102.
 
 ## The format
 
-rs3cache reads models the way rsmv does, plus four things rsmv can't handle:
+A few things about the format are worth knowing:
 
 - **LZMA.** Model files are compressed with LZMA. `rs3mcp/cachefile.py` unpacks them.
-- **Float positions.** Some models store positions as floats instead of whole numbers. rsmv can't read
-  these. In one sample of 1,000 models, 166 were like this.
+- **Float positions.** Some models store positions as floats instead of whole numbers. In one sample
+  of 1,000 models, 166 were like this.
 - **Counts that wrap.** A part's triangle count only goes up to 65,535, then starts again from 0.
   When the count doesn't fit, rs3cache adds 65,536 until it does.
 - **Very big models.** Three models have more than 65,535 vertices. Those store their triangles
@@ -48,7 +48,7 @@ A model only counts as read if every byte of it was used. All 145,735 are.
 ## The mesh
 
 If you need the full shape and not just the summary, pass `mesh=True`. You get each part's positions,
-colours and triangles. Where rsmv can read a model, the result matches it exactly.
+colours and triangles.
 
 ```python
 from rs3mcp import cachefile, models

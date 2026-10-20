@@ -19,8 +19,7 @@ import sqlite3
 from .cache import KINDS, MORPHS, decode_morphs, name_of, parents_of
 from .common import connect
 
-# link fields, tribyte
-# modern RS3, so only these are worth reporting.
+# link fields, tribyte on modern RS3 only
 ITEM_LINKS = {
     "noteLink": "the other half of the note pair",
     "noteTemplate": "the note template this item uses",
@@ -30,6 +29,7 @@ ITEM_LINKS = {
     "boughtTemplate": "the template this item is a bought copy of",
     "shardLink": "the shard copy",
     "shardTemplate": "the template this item is a shard of",
+    "recipeTemplate": "the construction recipe template this plan is drawn with",
 }
 
 
@@ -90,8 +90,6 @@ def _item_family(c, row):
             links.append({"field": field, "means": means, **got})
 
     # who links to this item, from the sidecar
-    # Without it this was sixteen LIKE scans over every item, a second per call. The fallback
-    # below still answers correctly when rs3-index.db is missing, only slowly.
     want = row["id"]
     idx = _index()
     if idx is not None:

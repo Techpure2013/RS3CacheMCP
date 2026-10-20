@@ -99,7 +99,7 @@ def checks():
         add("fail", "Data folder", "cannot write to %s: %s" % (common.ROOT, e),
             "move rs3cache somewhere your account can write, or set RS3MCP_DATA to such a folder")
 
-    # programs an add-on's tools run, which it names itself
+    # programs an add-on's tools run, named by it
     wanted = [pair for offered in addons.every("programs") for pair in offered]
     for tool, needed_by in wanted:
         where = shutil.which(tool)

@@ -30,7 +30,7 @@ import sqlite3
 from .common import ROOT
 INDEX = os.path.join(ROOT, "rs3-index.db")
 
-# what a caller may ask for, and the column value it maps to
+# what a caller may ask for, mapped
 KINDS = {
     "varbit": "varbit", "varp": "varp", "varplayer": "varp", "varclient": "varclient",
     "obj": "obj", "item": "obj", "npc": "npc", "loc": "loc", "seq": "seq",
@@ -43,9 +43,7 @@ _C = {}
 
 def _db():
     if "c" not in _C:
-        # The shared opener, so this gets the same staleness refusal as the rest. This one had
-        # neither a probe nor a stamp check, so it would happily answer from an index built
-        # against a different cache.
+        # the shared opener, for the same staleness refusal
         from .common import sidecar
         _C["c"] = sidecar("script_ref")
     return _C["c"]
@@ -86,7 +84,7 @@ def tool_script_refs(args):
                 "note": "the ids of this kind that the most scripts touch. Add id= for one."}
 
     ident = str(who).strip()
-    # a varbit is negative in the database and positive in the scripts; accept either
+    # a varbit is negative here, positive in scripts
     if KINDS[kind] == "varbit" and ident.startswith("-"):
         ident = ident[1:]
     try:

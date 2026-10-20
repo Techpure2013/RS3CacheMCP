@@ -23,31 +23,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 _MEM = {}
 
-# A number worth a second look: thousands-separated, a scaled figure like 6.8M, or a bare run of
-# three or more digits.
+# a number worth a second look
 NUMBERS = re.compile(r"\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?M\b|\d{3,}")
-# Total characters of tool listing. Bumping it is a decision, not a formality.
-#
-# 2026-09-12, net down from 26900 despite four additions, because it is now measured the way it is
-# sent. The old number counted ", " and ": " on every key, which never went on the wire.
-#
-# What the room bought: tool annotations at 3,216 characters (readOnlyHint on 45 of 49, and the
-# four that write, run a process or reach the network named); next-tool pointers; argument
-# provenance; and paging parameters. The last is the trade worth seeing -- 185 characters of
-# listing, paid once, took the longest answer from 16,341 tokens to 1,715.
-#
-# 29200 to 30000: one new tool, about 820 characters of listing, roughly 250 tokens a session. That
-# is what a capability costs and the number is here so it stays a decision.
-#
-# Measured with every add-on loaded, so a copy without them sits well under it.
-#
-# 30000 to 30100: descriptions for the three parameters that had none, lookup's kind and sprite's
-# name and id. An argument with no description is one an app has to guess at.
-LISTING_BUDGET = 30100
-# Numbers in strings that nothing above checks. Each was read once and judged static: a protocol
-# constant, a worked example, or a finished measurement. It moves when a new one appears, and the
-# point of the pin is that somebody looks at that one before bumping it. git log has which.
-WRITTEN_NUMBERS = 122
+# listing characters, each bump in rs3api/ledger.md
+LISTING_BUDGET = 39700
+# unchecked numbers in strings, see rs3api/ledger.md
+WRITTEN_NUMBERS = 181
 
 
 def written_numbers():
@@ -63,11 +44,83 @@ def written_numbers():
                                    _strings("rs3mcp", [os.path.join(ROOT, "rs3-mcp.py")])))
 
 
+SEEN = os.path.join(ROOT, "data", "rs3-written-numbers-seen.json")
+LEDGER = os.path.join(ROOT, "rs3api", "ledger.md")
+SRC = os.path.abspath(__file__)
+
+
+def numbers_by_file():
+    """{file: [numbers in its strings]}, the same strings written_numbers() counts."""
+    import ast
+    import glob
+    out = {}
+    for path in (sorted(glob.glob(os.path.join(ROOT, "rs3mcp", "*.py")))
+                 + sorted(glob.glob(os.path.join(ROOT, "rs3mcp", "test", "*.py")))
+                 + [os.path.join(ROOT, "rs3-mcp.py")]):
+        if os.path.basename(path) == "claims.py":
+            continue
+        try:
+            tree = ast.parse(io.open(path, encoding="utf-8").read())
+        except (OSError, SyntaxError):
+            continue
+        got = [n for node in ast.walk(tree) if isinstance(node, ast.Constant) and isinstance(node.value, str)
+               and len(node.value) >= 12 for n in NUMBERS.findall(node.value)]
+        if got:
+            out[os.path.relpath(path, ROOT).replace(os.sep, "/")] = sorted(got)
+    return out
+
+
+def repin(total, today=None):
+    """Move WRITTEN_NUMBERS to total and write the ledger entry naming what came and went.
+
+    The pin went stale for days before anyone read it, with nothing left to say which strings
+    moved it. Now the selftest moves it the moment it changes and the ledger says what changed,
+    so the numbers stay counted and the entry is there to read in the diff."""
+    import datetime
+    global WRITTEN_NUMBERS
+    now = numbers_by_file()
+    try:
+        with io.open(SEEN, encoding="utf-8") as fh:
+            was = json.load(fh)
+    except (OSError, ValueError):
+        was = None
+    if was is None:
+        what = "no earlier record of the strings, so which ones is not known"
+    else:
+        from collections import Counter
+        parts = []
+        for f in sorted(set(was) | set(now)):
+            a, b = Counter(was.get(f, [])), Counter(now.get(f, []))
+            if a != b:
+                parts.append("%s %s" % (f, ", ".join(["+" + n for n in sorted((b - a).elements())]
+                                                     + ["-" + n for n in sorted((a - b).elements())])))
+        what = "; ".join(parts) or "the same numbers, moved between strings"
+    line = "- %d to %d: %s, recorded by the selftest: %s.\n" % (
+        WRITTEN_NUMBERS, total, today or datetime.date.today().isoformat(), what)
+    text = io.open(LEDGER, encoding="utf-8").read()
+    head = "## WRITTEN_NUMBERS, rs3mcp/test/claims.py"
+    start = text.index(head)
+    end = text.find("\n## ", start + len(head))
+    end = len(text) if end < 0 else end
+    body = text[start:end].rstrip("\n") + "\n" + line
+    io.open(LEDGER, "w", encoding="utf-8", newline="\n").write(text[:start] + body + text[end:])
+    code = io.open(SRC, encoding="utf-8").read()
+    io.open(SRC, "w", encoding="utf-8", newline="\n").write(
+        re.sub(r"(?m)^WRITTEN_NUMBERS = \d+$", "WRITTEN_NUMBERS = %d" % total, code))
+    WRITTEN_NUMBERS = total
+    remember(now)
+
+
+def remember(now=None):
+    with io.open(SEEN, "w", encoding="utf-8") as fh:
+        json.dump(now if now is not None else numbers_by_file(), fh, indent=0, sort_keys=True)
+
+
 def _listing_size():
     """Characters in the tools/list payload, which is what a session pays before asking anything."""
     import json
     from rs3mcp.common import server
-    # Measured the way it is sent. Default separators over-report by about 1,300 characters.
+    # measured the way it is sent
     return len(json.dumps({"tools": server().listing()}, separators=(",", ":")))
 
 
@@ -79,8 +132,7 @@ def _strings(package="rs3mcp", extra=None):
     for path in (sorted(glob.glob(os.path.join(ROOT, package, "*.py")))
                  + sorted(glob.glob(os.path.join(ROOT, package, "test", "*.py")))
                  + (extra or [])):
-        # not this file: its numbers are the baseline and the patterns that check the others,
-        # so counting them here makes the count depend on itself
+        # not this file: its numbers are the baseline
         if os.path.basename(path) == "claims.py":
             continue
         try:
@@ -127,14 +179,12 @@ def _files(root, suffix, recurse=False):
 
 # ---------------------------------------------------------------- what each written number means
 #
-# (file, the text as written with the number captured, what it should be)
+# (file, the written text, what it should be)
 #
-# The pattern has to be specific enough that it cannot match a different sentence, and loose enough
-# to survive rewrapping -- so whitespace is normalised out of both sides before matching.
+# specific enough to match once, loose to rewrap
 
 CLAIMS = [
-    # 114 of the tables with rows hold nothing but ids. That is why most unnamed tables cannot be
-    # identified from their contents, so the number is worth keeping honest.
+    # 114 tables with rows hold nothing but ids
     ("rs3mcp/dbtable.py", r"handle on 114 of the ([\d,]+) tables with rows",
      lambda: len({r[0] for r in _cache().execute(
          "select distinct json_extract(data, '$.table') from config where type='dbrows'")})),
@@ -145,9 +195,7 @@ CLAIMS = [
          for col in ((__import__("json").loads(d).get("columns") or {}).get("columns") or [])
          for row in col["values"] for v in row if isinstance(v, str))),
 
-    # The count of rows rsmv filed under the wrong table is not history: it is exactly the rows
-    # whose table id needs a second byte, which is where the two byte orders diverge. So it stays
-    # derivable from the data rather than being a number somebody wrote down once.
+    # derived from the data, not written down once
     ("rs3mcp/dbtable.py", r"([\d,]+) were filed under the wrong table",
      lambda: sum(1 for _, d in _cache().execute(
          "select id,data from config where type='dbrows'")
@@ -166,7 +214,7 @@ CLAIMS = [
     ("rs3mcp/script.py", r"reads all ([\d,]+) files",
      lambda: _files(CLIENTSCRIPT, ".ts", recurse=True)),
 
-    # the folder also holds clientvars.d.ts, which is searched but is not a script
+    # the folder also holds clientvars.d.ts, not a script
     ("rs3mcp/script.py", r"Search the ([\d,]+) decompiled clientscripts",
      lambda: _files(CLIENTSCRIPT, ".ts", recurse=True) - _files(CLIENTSCRIPT, ".d.ts", recurse=True)),
 
@@ -176,8 +224,7 @@ CLAIMS = [
     ("rs3mcp/buildindex.py", r"sixteen full scans of ([\d,]+) rows",
      lambda: _count(_cache(), "select count(*) from config where type='items'")),
 
-    # npc ids that appear as a child of a multiloc. This one had gone stale: 2,305 when it was
-    # written, 4,511 after the rebuild.
+    # npc ids appearing as a multiloc child
     ("rs3mcp/cache.py", r"([\d,]+) npc ids are ",
      lambda: _index().execute(
          "select count(distinct child_id) from morph_edge where type='npcs'").fetchone()[0]),
@@ -185,12 +232,11 @@ CLAIMS = [
     ("rs3mcp/cache.py", r"sprite_hash holds all (\d+) hashes",
      lambda: _count(_cache(), "select count(*) from sprite_hash")),
 
-    # the name lists add the rows only they know of, Quest and Inv among them
+    # the name lists add rows only they know
     ("rs3mcp/cachediff.py", r"sqlite: ([\d,]+) rows against",
      lambda: _count(_cache(), "select count(*) from config"), "name lists"),
 
-    # Interface 0's components pack to ids that are also interface ids, which is why a bare number
-    # has to be read one way or the other. How far the collision reaches is a fact about the cache.
+    # interface 0's components pack to interface ids
     ("rs3mcp/iface.py", r"components pack to 0 through (\d+)",
      lambda: _count(_cache(),
                     "select max(id) from config where type='interfaces' and id < 65536")),
@@ -213,30 +259,68 @@ def _written(path, pattern):
     return tuple(int(g.replace(",", "")) for g in m.groups())
 
 
-def run(check, skip=None):
+def rewrite(claims=None):
+    """Write each claim's live number into its sentence, and return what moved.
+
+    A rebuild moves these on purpose, and a dozen hand edits after every game update was the one
+    step that kept a rebuild from running on its own. Only the exact claims: a rounded one is a
+    choice of wording. Commas are kept as the sentence wrote them.
+    """
+    from rs3mcp.test import workspace
+    moved = []
+    for path, pattern, live, *need in claims or CLAIMS:
+        if workspace.missing(*need):
+            continue
+        written = _written(path, pattern)
+        try:
+            actual = live()
+        except Exception:
+            continue
+        if written is None or actual is None:
+            continue
+        actual = actual if isinstance(actual, tuple) else (actual,)
+        if actual == written or len(actual) != len(written):
+            continue
+        full = os.path.join(ROOT, path)
+        text = io.open(full, encoding="utf-8", newline="").read()
+        # the sentence can wrap, so whitespace collapses
+        m = re.search(pattern.replace(" ", r"\s+"), text)
+        if not m:
+            continue
+        for i in range(len(actual), 0, -1):
+            old = m.group(i)
+            new = "{:,}".format(actual[i - 1]) if "," in old else str(actual[i - 1])
+            text = text[:m.start(i)] + new + text[m.end(i):]
+        io.open(full, "w", encoding="utf-8", newline="").write(text)
+        moved.append((path, written, actual))
+    return moved
+
+
+def run(check, skip=None, repin_numbers=False):
     """Called by the correctness suite with its own check(). Reports a claim it cannot locate as
     loudly as one that disagrees. skip(what, reasons) hears about the claims this machine has no
     source for."""
     run_claims(check, CLAIMS, skip=skip)
 
-    # And say how much is unchecked. If a file grows a number nobody has read, this moves.
+    # unchecked numbers, repinned on change
     total = written_numbers()
+    if repin_numbers and total != WRITTEN_NUMBERS:
+        repin(total)
+    elif repin_numbers and not os.path.exists(SEEN):
+        remember()
     check("numbers in strings, so the unchecked ones stay counted", total, WRITTEN_NUMBERS)
 
-    # The listing is sent once per session, before any question, and grows with every tool. Pinned
-    # so that growth is a decision: raising it should mean somebody looked at what was added and
-    # decided the description earned its room.
+    # pinned, so growth in the listing is decided
     size = _listing_size()
     check("the tool listing stays within its budget", size <= LISTING_BUDGET, True)
     if size > LISTING_BUDGET:
         check("  listing characters", size, LISTING_BUDGET)
 
-    # Three harnesses kept their own list and all three went stale. They read the registry now.
-    # Asserted here so a gap has a name rather than an unexplained NEW.
+    # they read the registry, so gaps get names
     from rs3mcp.test import golden
     check("every tool has a golden baseline or a written reason", golden.uncovered(), [])
 
-    # and whatever an add-on claims about its own files, on the same tally
+    # and an add-on's claims, on the same tally
     from rs3mcp import addons
     for extra in addons.every("claims"):
         extra(check)

@@ -1,6 +1,6 @@
 """
 Render a model straight to a png, so it can be looked at without a 3d viewer. Takes a model id out
-of the game cache, or an rsmv model json.
+of the game cache.
 
 Software rasteriser, no gpu and no dependencies past Pillow and numpy. Painter's algorithm: sort the
 triangles back to front and fill them. Good enough for "what is this thing", which is the point.
@@ -8,7 +8,7 @@ triangles back to front and fill them. Good enough for "what is this thing", whi
 Vertex colour in the cache is RS's packed hsl -- 6 bits hue, 3 saturation, 7 lightness in one
 ushort -- not rgb, so it has to be unpacked or everything comes out grey noise.
 
-  python model_png.py <model id or rsmv models-N.json> <out.png> [size] [label]
+  python model_png.py <model id> <out.png> [size] [label]
 """
 
 import colorsys

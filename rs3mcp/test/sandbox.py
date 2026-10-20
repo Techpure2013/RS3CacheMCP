@@ -44,15 +44,14 @@ def new(name):
     shutil.copytree(PKG, os.path.join(dest, "rs3mcp"),
                     ignore=shutil.ignore_patterns(*SKIP))
     shutil.copy2(os.path.join(ROOT, "rs3-mcp.py"), os.path.join(dest, "rs3-mcp.py"))
-    # the add-ons ride along, or the box answers without them and every test on their tools fails.
-    # files and promote still only compare rs3mcp/
+    # the add-ons ride along, or their tests fail
     sys.path.insert(0, ROOT)
     from rs3mcp import addons
     for pkg in addons.named():
         if os.path.isdir(os.path.join(ROOT, pkg)):
             shutil.copytree(os.path.join(ROOT, pkg), os.path.join(dest, pkg),
                             ignore=shutil.ignore_patterns(*SKIP))
-    # the golden baseline stays shared: a sandbox is compared against live, not against itself
+    # the golden baseline stays shared, compared against live
     print("sandbox %s ready at %s" % (name, dest))
     print("edit rs3mcp/ under there, then: sandbox check %s" % name)
     return 0
@@ -89,8 +88,7 @@ def check(name):
     if not os.path.isdir(dest):
         print("no such sandbox: " + name)
         return 1
-    # the sandbox has its own copy of the package but shares the golden baseline, so a diff is
-    # against live rather than against itself
+    # its own package copy, the baseline still shared
     gold = os.path.join(PKG, "test", "golden")
     boxgold = os.path.join(dest, "rs3mcp", "test", "golden")
     if os.path.isdir(boxgold):

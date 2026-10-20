@@ -58,9 +58,8 @@ A config that can't be read all the way to its end is left out, and listed in `_
 
 Clientscripts are turned back into code by the decompiler ([clientscripts](clientscripts.md)). Every
 game update shuffles the script instructions, so the rebuild works out the new order first, which
-takes about five seconds. If that doesn't work, it falls back to rsmv, if you have it at
-`_RS3_Data/rsmv-master` next to rs3cache. If you don't, it skips the scripts, tells you, and builds
-everything else.
+takes about five seconds. If that doesn't work, it skips the scripts, tells you, and builds
+everything else. Your old scripts stay.
 
 Sprites are saved as `sprites-<id>.png`, each at the size the game draws it. They take up about
 2.8 GB, mostly loading screens. The old set is kept as a backup, so the data folder ends up around

@@ -1,0 +1,418 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>rs3cache console</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #0b0d10; --panel: #12151a; --line: #1e242c; --text: #c9d2dc; --dim: #6c7a89;
+    --ok: #4c9a76; --warn: #b6893f; --err: #b3544c; --accent: #4a7fb5; --arc: #7fb2e8;
+    --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.5 var(--mono); height: 100vh; overflow: hidden;
+  }
+  .grid { display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 38px 1fr 26px; height: 100vh; }
+  header {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 18px;
+    padding: 0 12px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header b { font-weight: 600; letter-spacing: .04em; }
+  header .stat { color: var(--dim); }
+  header .stat span { color: var(--text); }
+  nav { border-right: 1px solid var(--line); overflow: auto; padding: 6px 0; background: var(--panel); }
+  nav .node {
+    padding: 1px 10px 1px 0; white-space: nowrap; cursor: pointer; color: var(--dim);
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  nav .node.dir { color: var(--text); }
+  nav .node:hover { background: #171b21; }
+  nav .node.hot { color: var(--arc); }
+  nav .node.picked { background: #182029; color: var(--arc); }
+  nav .twist { display: inline-block; width: 12px; color: var(--dim); }
+  nav .n { float: right; color: var(--dim); font-size: 11px; padding-left: 8px; }
+  main { position: relative; overflow: hidden; display: grid; grid-template-rows: 1fr auto; }
+  #feed { overflow: auto; padding: 4px 0 8px; }
+  .row { cursor: pointer; }
+  #detail {
+    border-top: 1px solid var(--line); background: var(--panel); max-height: 46vh;
+    overflow: auto; display: none;
+  }
+  #detail.open { display: block; }
+  #detail .head {
+    position: sticky; top: 0; background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: 4px 12px; display: flex; gap: 12px; align-items: center;
+  }
+  #detail .head b { color: var(--accent); font-weight: 600; }
+  #detail .head .x { margin-left: auto; cursor: pointer; color: var(--dim); }
+  #detail pre {
+    margin: 0; padding: 6px 12px 10px; white-space: pre-wrap; word-break: break-word;
+    color: var(--text); font: 12px/1.45 var(--mono);
+  }
+  #detail .label { color: var(--dim); padding: 6px 12px 0; }
+  #detail pre.err { color: var(--err); }
+  .row { display: grid; grid-template-columns: 62px 74px 1fr 66px; gap: 8px; padding: 1px 12px; }
+  .row:hover { background: #12161c; }
+  .t { color: var(--dim); }
+  .tool { color: var(--accent); overflow: hidden; text-overflow: ellipsis; }
+  .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .size { text-align: right; color: var(--dim); }
+  .row.err .what { color: var(--err); }
+  .row.prompt .what { color: var(--warn); }
+  .row.prompt .tool { color: var(--warn); }
+  canvas#arc { position: absolute; inset: 0; pointer-events: none; }
+  footer {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px;
+    padding: 0 12px; border-top: 1px solid var(--line); color: var(--dim); background: var(--panel);
+  }
+  footer .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
+  footer .dot.stale { background: var(--err); }
+</style>
+
+<div class="grid">
+  <header>
+    <b>rs3cache</b>
+    <span class="stat">calls <span id="nCalls">0</span></span>
+    <span class="stat">errors <span id="nErr">0</span></span>
+    <span class="stat">files <span id="nFiles">0</span></span>
+    <span class="stat">sessions <span id="nSess">0</span></span>
+    <span class="stat" id="boxStat" style="margin-left:auto;cursor:pointer" title="test runs"></span>
+    <span class="stat">last <span id="last">-</span></span>
+  </header>
+  <nav id="tree"></nav>
+  <main>
+    <canvas id="arc"></canvas>
+    <div id="feed"></div>
+    <div id="detail">
+      <div class="head"><b id="dTool"></b><span id="dWhen"></span><span class="x" id="dClose">close</span></div>
+      <div class="label">asked</div>
+      <pre id="dIn"></pre>
+      <div class="label">answered</div>
+      <pre id="dOut"></pre>
+    </div>
+  </main>
+  <footer>
+    <span><span class="dot" id="live"></span> <span id="state">connecting</span></span>
+    <span id="note"></span>
+  </footer>
+</div>
+
+<script>
+const feed = document.getElementById("feed");
+const tree = document.getElementById("tree");
+const arc = document.getElementById("arc");
+const ctx = arc.getContext("2d");
+let after = 0, calls = 0, errors = 0, pending = new Map(), bolts = [], log = [];
+// The last hour is drawn first and the rest is fetched behind it. Asking for everything meant a
+// 1.8 MB answer before a single row could appear, which read as a page that had not loaded.
+const HOUR = 3600e3;
+const edge = Date.now() - HOUR;
+let backfilled = false;
+
+function fit() { arc.width = arc.clientWidth; arc.height = arc.clientHeight; }
+addEventListener("resize", fit); fit();
+
+function clock(ms) {
+  const d = new Date(ms);
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
+       + ":" + String(d.getSeconds()).padStart(2, "0");
+}
+
+function shorten(p) {
+  if (!p) return "";
+  const bits = String(p).replace(/\\/g, "/").split("/");
+  return bits.length > 3 ? bits.slice(-3).join("/") : bits.join("/");
+}
+
+// A real folder tree: every place is split on / and hung off its parent, counts rolling up, so a
+// folder shows what its whole subtree cost. Flat leaf paths read as a wall of near-identical lines.
+const root = { kids: new Map(), n: 0, t: 0 };
+const leaves = new Set();
+const shut = new Set();
+let picked = null;
+
+function remember(place) {
+  if (!place) return;
+  const bits = String(place).replace(/\\/g, "/").split("/").filter(Boolean);
+  leaves.add(bits.join("/"));
+  let node = root;
+  node.n += 1; node.t = Date.now();
+  for (const bit of bits) {
+    if (!node.kids.has(bit)) node.kids.set(bit, { kids: new Map(), n: 0, t: 0 });
+    node = node.kids.get(bit);
+    node.n += 1; node.t = Date.now();
+  }
+}
+
+function branch(node, path, depth, fresh, out) {
+  const kids = [...node.kids.entries()].sort((a, b) => b[1].n - a[1].n);
+  for (const [name, kid] of kids) {
+    const full = path ? path + "/" + name : name;
+    const folder = kid.kids.size > 0;
+    const closed = shut.has(full);
+    out.push(`<div class="node ${folder ? "dir" : ""} ${kid.t > fresh ? "hot" : ""}`
+           + `${picked === full ? " picked" : ""}" data-path="${full}" data-dir="${folder ? 1 : 0}"`
+           + ` style="padding-left:${6 + depth * 11}px" title="${full}">`
+           + `<span class="twist">${folder ? (closed ? "+" : "-") : ""}</span>${name}`
+           + `<span class="n">${kid.n}</span></div>`);
+    if (folder && !closed && depth < 6) branch(kid, full, depth + 1, fresh, out);
+  }
+}
+
+function drawTree() {
+  const out = [];
+  branch(root, "", 0, Date.now() - 45000, out);
+  tree.innerHTML = out.join("");
+}
+
+// A folder filters the feed; clicking it again opens or shuts it
+tree.addEventListener("click", e => {
+  const node = e.target.closest(".node");
+  if (!node) return;
+  const path = node.dataset.path;
+  if (node.dataset.dir === "1" && picked === path) {
+    shut.has(path) ? shut.delete(path) : shut.add(path);
+  } else {
+    picked = picked === path ? null : path;
+  }
+  drawTree();
+  for (const row of feed.children) {
+    row.style.display = !picked || (row.dataset.place || "").startsWith(picked) ? "" : "none";
+  }
+  if (picked) summarise(picked); else document.getElementById("detail").classList.remove("open");
+});
+
+// What went on under a folder, off the events already held: who touched it, how, and when
+function summarise(path) {
+  const mine = log.filter(e => (e.place || "").replace(/\\/g, "/").startsWith(path));
+  const acts = new Map(), files = new Map(), tools = new Map(), sess = new Set();
+  let failed = 0, first = 0, last = 0;
+  for (const e of mine) {
+    acts.set(e.act || "call", (acts.get(e.act || "call") || 0) + 1);
+    tools.set(e.tool, (tools.get(e.tool) || 0) + 1);
+    const rest = (e.place || "").replace(/\\/g, "/").slice(path.length).replace(/^\//, "");
+    if (rest) files.set(rest, (files.get(rest) || 0) + 1);
+    if (e.sid) sess.add(e.sid);
+    if (e.failed) failed++;
+    first = first ? Math.min(first, e.t) : e.t;
+    last = Math.max(last, e.t);
+  }
+  const top = m => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12)
+                    .map(([k, n]) => "  " + String(n).padStart(5) + "  " + k).join("\n") || "  (none)";
+  document.getElementById("dTool").textContent = path;
+  document.getElementById("dWhen").textContent = mine.length + " calls"
+    + (failed ? ", " + failed + " failed" : "") + ", " + sess.size + " session(s)";
+  document.getElementById("dIn").textContent =
+    (first ? "from " + clock(first) + " to " + clock(last) + "\n\n" : "")
+    + "what was done\n" + top(acts) + "\n\nby which tool\n" + top(tools);
+  const out = document.getElementById("dOut");
+  out.className = "";
+  out.textContent = "underneath\n" + top(files);
+  document.getElementById("detail").classList.add("open");
+}
+
+// One bolt per call, from the left edge to where the row landed. Two seconds, then gone.
+function bolt(y) {
+  bolts.push({ y, at: performance.now() });
+}
+
+function paint(now) {
+  ctx.clearRect(0, 0, arc.width, arc.height);
+  bolts = bolts.filter(b => now - b.at < 600);
+  for (const b of bolts) {
+    const k = (now - b.at) / 600;
+    ctx.globalAlpha = 0.5 * (1 - k);
+    ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--arc");
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    let x = 0, y = b.y;
+    ctx.moveTo(x, y);
+    const reach = arc.width * Math.min(1, k * 2.2);
+    while (x < reach) {
+      x += 14 + Math.random() * 18;
+      y = b.y + (Math.random() - 0.5) * 7;
+      ctx.lineTo(Math.min(x, reach), y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(paint);
+}
+requestAnimationFrame(paint);
+
+// A call's arguments as they were written, not as json. A shell command is the thing worth reading
+// and json turns it into one line with every newline spelled out.
+function pretty(input) {
+  if (input === null || input === undefined) return "(nothing sent)";
+  if (typeof input !== "object") return String(input);
+  const short = [], long = [];
+  for (const [key, value] of Object.entries(input)) {
+    const text = typeof value === "string" ? value : JSON.stringify(value, null, 1);
+    if (text.includes("\n") || text.length > 70) long.push([key, text]);
+    else short.push(key.padEnd(12) + text);
+  }
+  const out = short.length ? [short.join("\n")] : [];
+  for (const [key, text] of long) out.push(key + "\n" + text);
+  return out.join("\n\n") || "(nothing sent)";
+}
+
+// Clicking a row asks the server for that call and shows what was sent and what came back. The
+// event stream carries neither: a day of full answers is megabytes to hold for the one you open.
+async function open(id, tool, when) {
+  const box = document.getElementById("detail");
+  document.getElementById("dTool").textContent = tool || "call";
+  document.getElementById("dWhen").textContent = when || "";
+  document.getElementById("dIn").textContent = "reading...";
+  document.getElementById("dOut").textContent = "";
+  box.classList.add("open");
+  try {
+    const got = await (await fetch("/call?id=" + encodeURIComponent(id))).json();
+    document.getElementById("dTool").textContent = got.tool || tool || "call";
+    document.getElementById("dIn").textContent = pretty(got.input);
+    const out = document.getElementById("dOut");
+    out.textContent = got.result === undefined ? "(no answer recorded)" : got.result;
+    out.className = got.err ? "err" : "";
+  } catch (err) {
+    document.getElementById("dIn").textContent = "could not read that call";
+  }
+}
+document.getElementById("dClose").onclick = () =>
+  document.getElementById("detail").classList.remove("open");
+
+// What the test sandbox is doing: its suites, their checks, and the first failures. The add-on
+// runs them; without it these routes answer 404 and the header says nothing.
+let boxAfter = 0, boxRun = null, boxOn = false;
+
+async function sandbox(show) {
+  try {
+    const d = await (await fetch("/sandbox?after=" + boxAfter + (boxRun ? "&run=" + boxRun : ""))).json();
+    boxOn = true;
+    const run = d.run;
+    const head = document.getElementById("boxStat");
+    if (!run) {
+      head.textContent = "no test runs";
+      return;
+    }
+    boxRun = run.id;
+    const checks = (run.suites || []).reduce((n, s) => n + (s.checks || 0), 0);
+    const failed = (run.suites || []).reduce((n, s) => n + (s.failed || 0), 0);
+    head.textContent = "tests " + checks + (failed ? " · " + failed + " failed" : " · clean")
+                     + (d.active === run.id ? " · running" : "");
+    head.style.color = failed ? "var(--err)" : "var(--ok)";
+    if (Array.isArray(run.events) && run.events.length) {
+      boxAfter = run.events[run.events.length - 1].seq;
+    }
+    if (!show) return;
+    const lines = [];
+    for (const s of run.suites || []) {
+      // what the suite printed, when the sandbox's own markers did not reach it
+      const ran = s.checks || (s.harness ? s.harness[0] : 0);
+      const bad = s.failed || (s.harness ? s.harness[1] : 0);
+      lines.push("  " + String(ran).padStart(5) + " checks  " + String(bad).padStart(3) + " failed  "
+               + (s.uncounted ? "NOTHING COUNTED" : (s.state || "")) + "  " + (s.name || s.file || ""));
+    }
+    const bad = (run.events || []).filter(e => e.k === "check" && !e.ok).slice(-14)
+                 .map(e => "  " + (e.label || "") + (e.line ? "   line " + e.line : ""));
+    document.getElementById("dTool").textContent = "sandbox " + (run.project || "");
+    document.getElementById("dWhen").textContent = (run.reason || "") + (d.active === run.id ? "  running" : "  done");
+    document.getElementById("dIn").textContent = "suites\n" + (lines.join("\n") || "  (none yet)");
+    const out = document.getElementById("dOut");
+    out.className = bad.length ? "err" : "";
+    out.textContent = bad.length ? "failed checks\n" + bad.join("\n") : "nothing failed";
+    document.getElementById("detail").classList.add("open");
+  } catch (err) {
+    if (!boxOn) document.getElementById("boxStat").textContent = "";
+  }
+}
+document.getElementById("boxStat").onclick = () => sandbox(true);
+
+function add(kind, time, tool, what, size, bad, id, place) {
+  const row = document.createElement("div");
+  row.className = "row" + (bad ? " err" : "") + (kind === "prompt" ? " prompt" : "");
+  if (place) row.dataset.place = String(place).replace(/\\/g, "/");
+  if (id) row.onclick = () => open(id, tool, clock(time));
+  row.innerHTML = `<span class="t">${clock(time)}</span><span class="tool">${tool}</span>`
+                + `<span class="what"></span><span class="size">${size || ""}</span>`;
+  row.querySelector(".what").textContent = what || "";
+  const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40;
+  feed.appendChild(row);
+  while (feed.children.length > 400) feed.removeChild(feed.firstChild);
+  if (atBottom) feed.scrollTop = feed.scrollHeight;
+  const box = row.getBoundingClientRect();
+  const stage = arc.getBoundingClientRect();
+  if (box.top > stage.top && box.bottom < stage.bottom) bolt(box.top - stage.top + box.height / 2);
+}
+
+// Older events count towards the tree and the totals; only the newest rows are drawn, since the
+// feed keeps 400 of them anyway.
+async function backfill() {
+  if (backfilled) return;
+  backfilled = true;
+  try {
+    const d = await (await fetch("/events?until=" + edge)).json();
+    for (const e of d.events || []) {
+      if (e.kind === "call") { calls++; log.push(e); remember(e.place); }
+      else if (e.kind === "result" && e.err) errors++;
+    }
+    document.getElementById("nCalls").textContent = calls;
+    document.getElementById("nErr").textContent = errors;
+    document.getElementById("nFiles").textContent = leaves.size;
+    document.getElementById("note").textContent += "  ·  " + (d.events || []).length + " earlier calls read";
+    drawTree();
+  } catch (err) {
+    document.getElementById("note").textContent += "  ·  earlier calls unread";
+  }
+}
+
+async function tick() {
+  try {
+    const r = await fetch("/events?" + (after ? "after=" + after : "since=" + edge));
+    const d = await r.json();
+    after = d.next;
+    document.getElementById("state").textContent = "watching";
+    document.getElementById("live").classList.remove("stale");
+    document.getElementById("nSess").textContent = Object.keys(d.sessions || {}).length;
+    for (const e of d.events || []) {
+      if (e.kind === "call") {
+        calls++;
+        pending.set(e.id, e);
+        log.push(e);
+        if (log.length > 12000) log.splice(0, 4000);
+        remember(e.place);
+        add("call", e.t, e.tool, [e.act, shorten(e.place), e.detail].filter(Boolean).join("  "),
+            "", false, e.id, e.place);
+      } else if (e.kind === "result") {
+        const of = pending.get(e.of);
+        pending.delete(e.of);
+        if (of) of.failed = e.err || undefined;
+        if (e.err) {
+          errors++;
+          add("result", e.t, of ? of.tool : "result", (e.peek || "failed").slice(0, 160), "", true,
+              e.of, of && of.place);
+        }
+      } else if (e.kind === "prompt") {
+        add("prompt", e.t, "you", (e.text || "").replace(/\s+/g, " ").slice(0, 160), "", false);
+      }
+    }
+    document.getElementById("nCalls").textContent = calls;
+    document.getElementById("nErr").textContent = errors;
+    document.getElementById("nFiles").textContent = leaves.size;
+    if (d.events && d.events.length) {
+      document.getElementById("last").textContent = clock(d.events[d.events.length - 1].t);
+    }
+    drawTree();
+    if (!backfilled) setTimeout(backfill, 50);
+    sandbox(false);
+  } catch (err) {
+    document.getElementById("state").textContent = "no server";
+    document.getElementById("live").classList.add("stale");
+  }
+  setTimeout(tick, 1000);
+}
+
+fetch("/meta").then(r => r.json()).then(m => {
+  document.getElementById("note").textContent = (m.tools || []).length + " tools registered";
+}).catch(() => {});
+tick();
+</script>

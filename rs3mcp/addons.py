@@ -46,7 +46,7 @@ def load():
         try:
             pkg = importlib.import_module(name)
         except ModuleNotFoundError as e:
-            # absent is fine. A module inside it failing to import is a bug, and says so
+            # absent is fine, a failed import is not
             if e.name != name:
                 raise
             continue

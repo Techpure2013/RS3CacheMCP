@@ -11,8 +11,7 @@ costs nothing to ignore and the lazy one is one copy-paste from being a real cal
 
 import re
 
-# (what the command is doing, the tool that answers it). Ordered: the first match wins, so the
-# specific patterns sit above the general ones.
+# (what the command does, the tool answering it)
 ROUTES = [
     (re.compile(r"type\s*=\s*['\"]npcs['\"]", re.I), "rs3_lookup kind=npc"),
     (re.compile(r"type\s*=\s*['\"]objects['\"]", re.I), "rs3_lookup kind=loc"),
@@ -30,20 +29,20 @@ ROUTES = [
 
 
 def _routes():
-    # an add-on names the tables its own tools answer, as (pattern, tool) pairs
+    # an add-on names its own tables and tools
     from . import addons
     extra = [(re.compile(rx, re.I), tool) for offered in addons.every("bypass_routes")
              for rx, tool in offered]
     return extra + ROUTES
 
-# What counts as going round the tools at all.
+# what counts as going round the tools
 DIRECT = re.compile(
     r"rs3-cache\.db|rs3-index\.db"
     r"|from\s+rs3mcp[.\s]|import\s+rs3mcp\b"
     r"|rs3mcp\.common\s+import\s+connect",
     re.I)
 
-# Reaching into the server to build or test it is the job, not a bypass.
+# building or testing the server is the job
 BUILDING = re.compile(
     r"rs3-mcp\.py\s+--(test|golden|diff|selftest)"
     r"|rs3mcp[/\\]test[/\\]"

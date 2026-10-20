@@ -37,7 +37,7 @@ FLOWS = [
     ]),
 ]
 
-# habits that have cost time, kept to one line each
+# habits that have cost time, one line each
 RULES = [
     "Numbers written in prose go stale. rs3_drift checks them; add a claim rather than a comment.",
     "An encoding that reads the same at count 1 validates the wrong spec. Test the multi-valued records.",
@@ -76,10 +76,33 @@ def _set_names():
         return []
 
 
-def instructions():
-    """The text handed to a client at initialize."""
+# Claude Code's cut for server instructions
+CLIENT_CUT = 2048
+DETAILS = "Details, task by task:"
+
+
+def index():
+    """One line per task naming its tools in order, sized to survive CLIENT_CUT."""
     out = ["rs3cache: the RS3 game cache, decoded, and the checks that keep it honest.",
-           "", "What to do, in order:"]
+           "The full procedures follow this index and are the resource rs3://guide/tools.", ""]
+    for flow in _all_flows():
+        named = []
+        for tool, _why in flow[1]:
+            if tool and tool not in named:
+                named.append(tool)
+        out.append("  %s: %s" % (flow[0], ", ".join(named) or "see details"))
+    out.append("")
+    out.append("Any call takes pick=a.b.c for one part, outDir=<path> to write it to a file.")
+    return out
+
+
+def instructions(compact=False):
+    """The text handed to a client at initialize. Compact is the task index and how to reach a tool."""
+    if compact:
+        return "\n".join(index()[:1] + [
+            "Three tools reach the rest: rs3_find {task} names the best, rs3_how {tool} gives its "
+            "arguments, rs3_run {tool, args} runs it.", ""] + index()[3:])
+    out = index() + ["", DETAILS]
     for flow in _all_flows():
         what, steps = flow[0], flow[1]
         out.append("")
@@ -88,8 +111,7 @@ def instructions():
             out.append("    %-20s %s" % (tool or "-", why))
         if len(flow) > 2:
             out.append("    %-20s %s" % ("avoid", flow[2]))
-    # Two arguments every tool takes, handled in the dispatcher rather than in 49 schemas. Said
-    # once here because a listing is paid per session and this is not worth 49 copies of.
+    # two arguments handled in the dispatcher, said once
     out.append("")
     out.append("Any tool, any call:")
     out.append("  pick=a.b.c           one part of the answer by dotted path, digits index a list. "

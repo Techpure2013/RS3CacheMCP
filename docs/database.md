@@ -19,7 +19,7 @@ On this page
   - [varbit](#varbit)
 - [Config types](#config-types)
 
-Every table in the database, `data/rs3-cache.db`. It's a normal SQLite file, built on 2026-09-14 16:18.
+Every table in the database, `data/rs3-cache.db`. It's a normal SQLite file, built on 2026-09-22 09:05.
 
 This page is written from the database itself by `rs3 docs`, which runs after every rebuild, so the numbers are always current.
 
@@ -29,7 +29,7 @@ To ask the database something, use `rs3 query` with a SELECT. `rs3 schema` shows
 
 ### config
 
-857,250 rows.
+858,637 rows.
 
 | Column | Type | Key |
 |---|---|---|
@@ -44,7 +44,7 @@ Indexed: `ix_config_name`, `ix_config_display`, `config_name`
 
 ### enum_entry
 
-160,156 rows.
+160,209 rows.
 
 | Column | Type | Key |
 |---|---|---|
@@ -105,7 +105,7 @@ Indexed: `ix_loc_section`
 
 ### model_use
 
-6,384 rows.
+6,376 rows.
 
 | Column | Type | Key |
 |---|---|---|
@@ -118,7 +118,7 @@ Indexed: `ix_model_use`
 
 ### param_type
 
-6,017 rows.
+6,026 rows.
 
 | Column | Type | Key |
 |---|---|---|
@@ -130,7 +130,7 @@ Indexed: `ix_model_use`
 
 ### param_use
 
-775,910 rows.
+776,843 rows.
 
 | Column | Type | Key |
 |---|---|---|
@@ -146,7 +146,7 @@ Indexed: `pu_target`, `pu_str`, `ix_param_pid`, `ix_param_owner`
 
 ### sprite_hash
 
-36,425 rows.
+36,497 rows.
 
 | Column | Type | Key |
 |---|---|---|
@@ -155,7 +155,7 @@ Indexed: `pu_target`, `pu_str`, `ix_param_pid`, `ix_param_owner`
 
 ### sprite_name
 
-669 rows.
+671 rows.
 
 | Column | Type | Key |
 |---|---|---|
@@ -167,7 +167,7 @@ Indexed: `ix_sprite_name_n`
 
 ### sprite_use
 
-38,998 rows.
+38,971 rows.
 
 | Column | Type | Key |
 |---|---|---|
@@ -181,7 +181,7 @@ Indexed: `ix_sprite_use`, `ix_sprite_owner`
 
 ### varbit
 
-51,113 rows.
+51,152 rows.
 
 | Column | Type | Key |
 |---|---|---|
@@ -208,44 +208,44 @@ Indexed: `ix_varbit_name`, `ix_varbit_base`
 | Quest | 531 | 531 | | |
 | StyleSheet | 318 | 318 | | |
 | VarClient | 7,749 | 7,681 | | |
-| VarPlayer | 64,388 | 60,228 | | |
+| VarPlayer | 64,538 | 60,228 | | |
 | VarPlayerGroup | 3 | 3 | | |
-| achievements | 5,086 | 4,900 | `specs/achievements.ops` | 30 |
-| animgroupconfigs | 4,916 | 4,906 | `specs/animgroupconfigs.ops` | 24 |
+| achievements | 5,086 | 4,900 | `specs/achievements.ops` | 33 |
+| animgroupconfigs | 4,917 | 4,907 | `specs/animgroupconfigs.ops` | 24 |
 | cutscenes | 9 | 0 | `specs/cutscenes.ops` | one record shape |
-| dbrows | 20,031 | 15,340 | `specs/dbrows.ops` | 2 |
-| dbtables | 386 | 242 | `specs/dbtables.ops` | 1 |
-| enums | 16,694 | 8,559 | `specs/enums.ops` | 12 |
+| dbrows | 20,129 | 15,340 | `specs/dbrows.ops` | 2 |
+| dbtables | 387 | 242 | `specs/dbtables.ops` | 1 |
+| enums | 16,701 | 8,559 | `specs/enums.ops` | 12 |
 | environments | 196 | 0 | `specs/environments.ops` | 4 |
 | fontmetrics | 225 | 0 | `specs/fontmetrics.ops` | one record shape |
 | identitykit | 1,096 | 0 | `specs/identitykit.ops` | 6 |
-| interfaces | 104,285 | 103,995 | `specs/interfaces.ops` | one record shape |
-| items | 63,414 | 61,293 | `specs/items.ops` | 88 |
-| maplabels | 5,812 | 0 | `specs/maplabels.ops` | 21 |
+| interfaces | 104,199 | 103,909 | `specs/interfaces.ops` | one record shape |
+| items | 63,530 | 61,293 | `specs/items.ops` | 88 |
+| maplabels | 5,812 | 0 | `specs/maplabels.ops` | 24 |
 | mapscenes | 150 | 0 | `specs/mapscenes.ops` | 5 |
 | mapzones | 771 | 0 | `specs/mapzones.ops` | one record shape |
-| materials | 24,858 | 0 | `specs/materials.ops` | one record shape |
-| models | 145,735 | 0 | | |
-| npcs | 32,762 | 32,703 | `specs/npcs.ops` | 69 |
-| objects | 140,252 | 137,174 | `specs/objects.ops` | 95 |
+| materials | 24,967 | 0 | `specs/materials.ops` | one record shape |
+| models | 145,875 | 0 | | |
+| npcs | 32,762 | 32,703 | `specs/npcs.ops` | 74 |
+| objects | 140,298 | 137,174 | `specs/objects.ops` | 98 |
 | overlays | 596 | 0 | `specs/overlays.ops` | 12 |
-| params | 9,473 | 5,991 | `specs/params.ops` | 2 |
+| params | 9,482 | 5,992 | `specs/params.ops` | 2 |
 | particles0 | 4,519 | 0 | `specs/particles0.ops` | 33 |
 | particles1 | 57 | 0 | `specs/particles1.ops` | 7 |
 | quickchatcats | 269 | 0 | `specs/quickchatcats.ops` | 3 |
-| quickchatlines | 3,039 | 0 | `specs/quickchatlines.ops` | 4 |
-| sequences | 38,084 | 37,889 | `specs/sequences.ops` | 23 |
-| spotanims | 9,264 | 0 | `specs/spotanims.ops` | 12 |
-| structs | 53,074 | 35,371 | `specs/structs.ops` | 1 |
+| quickchatlines | 3,039 | 0 | `specs/quickchatlines.ops` | 5 |
+| sequences | 38,114 | 37,889 | `specs/sequences.ops` | 23 |
+| spotanims | 9,284 | 0 | `specs/spotanims.ops` | 12 |
+| structs | 53,173 | 35,470 | `specs/structs.ops` | 1 |
 | underlays | 728 | 0 | `specs/underlays.ops` | 5 |
-| varbits | 61,889 | 0 | `specs/varbits.ops` | 3 |
+| varbits | 61,928 | 0 | `specs/varbits.ops` | 3 |
 | varcampaign | 3,759 | 0 | `specs/varcampaign.ops` | 1 |
 | varclan | 1,634 | 0 | `specs/varclan.ops` | 2 |
-| varclansettings | 2,357 | 0 | `specs/varclansettings.ops` | 2 |
+| varclansettings | 2,857 | 0 | `specs/varclansettings.ops` | 2 |
 | varclient | 7,749 | 0 | `specs/varclient.ops` | 3 |
 | varnpc | 989 | 0 | `specs/varnpc.ops` | 1 |
 | varobject | 5 | 0 | `specs/varobject.ops` | 2 |
-| varplayer | 13,270 | 0 | `specs/varplayer.ops` | 4 |
+| varplayer | 13,378 | 0 | `specs/varplayer.ops` | 4 |
 | varplayergroup | 646 | 0 | `specs/varplayergroup.ops` | 1 |
 | varregion | 464 | 0 | `specs/varregion.ops` | 1 |
 | varworld | 1,724 | 0 | `specs/varworld.ops` | 1 |

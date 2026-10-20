@@ -40,9 +40,9 @@ NAMES = {
     133: "stylesheet", 209: "var_reference",
 }
 
-# types that say nothing more than the stack a value is on
+# types naming only the stack a value uses
 PLAIN = {0, 36, 110, 501, 502, 503}
-# the ones that are not even that: rsmv's placeholders for a type it could not tell
+# placeholders for a type nobody could tell
 UNKNOWN = {501, 502, 503}
 
 
@@ -81,7 +81,7 @@ class Votes:
         self.known = {}
 
     def vote(self, slot, t):
-        # a plain int is a vote too, or one boolean among a thousand ints would carry the slot
+        # a plain int is a vote too
         if slot is not None and t is not None and t not in UNKNOWN:
             self.votes[slot][t] += 1
 

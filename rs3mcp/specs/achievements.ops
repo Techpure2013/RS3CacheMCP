@@ -1,6 +1,7 @@
 # achievements: every achievement, its category, and what it takes to complete.
 # The lists of progress share one entry: a kind, the value to reach, the label the interface shows,
-# and the vars that count. The 0x2x opcodes are the same lists with wider var ids.
+# and the vars that count. The 0x2x opcodes are the same lists with wider var ids. The beta client's
+# cache still has the narrow ones, 0x0A, 0x0E and 0x19 (checked 2026-09-25).
 
 type achievements
 index 57
@@ -14,9 +15,11 @@ index 57
 0x07 reward          pstring
 0x08 skills          list<{u8 ironman; u8 level; pstring text; list[u8]<u16> skills}>
 0x09 varps           list<{u8 kind; varu32 target; pstring text; list[u8]<u16 -> varplayer> vars}>
+0x0A wideVarps       list<{u8 kind; varu32 target; pstring text; list[u8]<u16> vars}> # beta: 0x21 with u16 vars
 0x0B previous        list<u24 -> achievements>
 0x0C skills2         list<{u8 ironman; u8 level; pstring text; list[u8]<u16> skills}>
 0x0D progress        list<{u8 kind; varu32 target; pstring text; list[u8]<u16> vars}>
+0x0E wideProgress    list<{u8 kind; varu32 target; pstring text; list[u8]<u16> vars}> # beta: 0x23 with u16 vars
 0x0F children        list<u24 -> achievements>
 0x10 subcategory     u16
 0x11 unk11           true
@@ -25,6 +28,7 @@ index 57
 0x14 quests          list<u24 -> quests>
 0x15 questsDone      list<u24 -> quests>
 0x17 bits            list<{u8 kind; u16 var; u8 unk; pstring text if kind==0; u16 need if kind==1; u8 bit}>
+0x19 wideBits        list<{u8 kind; u16 var; u8 unk; pstring text if kind==0; u16 need if kind==1; u8 bit}> # beta: 0x24 with a u16 var
 0x1A unk1A           u16
 0x1B unk1B           true
 0x1C skillCount      list[u8]<u8>

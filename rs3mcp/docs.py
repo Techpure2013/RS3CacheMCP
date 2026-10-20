@@ -24,7 +24,7 @@ from . import common, ops
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FOLDER = os.path.join(BASE, "docs")
 INDEX = "README.md"
-# a page with at least this many headings gets an "On this page" list
+# a page with this many headings gets one
 CONTENTS_FROM = 6
 
 
@@ -112,7 +112,7 @@ def with_nav(name, text, order):
 
 def tools_md(server):
     from . import addons, cli
-    # an add-on marked PRIVATE stays out of what is written down, since these pages are shared
+    # an add-on marked PRIVATE stays out of these
     private = addons.private_modules()
     by_set = {}
     for t in server.TOOLS:
@@ -129,7 +129,7 @@ def tools_md(server):
            "Every tool also takes `pick`, to get just one part of an answer (`pick=counts.npcs`), and "
            "`outDir`, to save the answer to a file. To show an app only some groups, see "
            "[settings](settings.md).", ""]
-    # anchors in the order the headings come, so a tool named like its group (wiki) links to the tool
+    # anchors in the order the headings come
     seen, anchor = {}, {}
     slug("Tools", seen)
     for name in sorted(by_set):

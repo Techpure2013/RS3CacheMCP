@@ -8,7 +8,7 @@ how many rows moved, it is whether anything built against these ids went away.
   recoded   the config name moved, so anything matching by code name stops matching
   added     new content, and the reason the rebuild was worth doing
 
-Both are opened read only and joined in sqlite: 857,250 rows against 853,963 is not something to
+Both are opened read only and joined in sqlite: 858,637 rows against 853,963 is not something to
 pull into memory.
 
   rs3_cache_diff  what changed between the current database and the one before it
@@ -22,7 +22,7 @@ from .common import ROOT
 CURRENT = os.path.join(ROOT, "rs3-cache.db")
 PREVIOUS = os.path.join(ROOT, "rs3-cache.db.bak")
 
-# the types anything outside the cache is likely to name. Everything else is reported as a count only.
+# the types anything outside the cache will name
 MATTERS = ("items", "objects", "npcs", "interfaces", "structs", "enums", "sequences", "spotanims")
 
 
@@ -45,8 +45,7 @@ def tool_cache_diff(args):
     only = str(args.get("type") or "").strip()
     c = _open(current, previous)
 
-    # one grouped count per database rather than two per type. Counting type by type meant about
-    # seventy queries over two 600MB files to answer a question that is two scans.
+    # one grouped count per database, not per type
     now_by = dict(c.execute("select type, count(*) from config group by type"))
     was_by = dict(c.execute("select type, count(*) from prev.config group by type"))
     counts = []

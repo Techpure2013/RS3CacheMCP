@@ -1,7 +1,7 @@
 """
 Everything that points at one config, and everything it points at.
 
-The data was always joinable and nothing joined it. param_use alone is 775,910 typed edges --
+The data was always joinable and nothing joined it. param_use alone is 776,843 typed edges --
 owner, param, value, and the config the value refers to when it refers to one -- and beside it sit
 enum_entry, sprite_use, model_use, inv_stock and loc_section.
 
@@ -17,7 +17,7 @@ from . import addons
 from .cache import KINDS
 from .common import connect
 
-# owner_type in param_use and sprite_use uses the cache's own type names
+# owner_type uses the cache's own type names
 LINKABLE = ("items", "npcs", "objects", "structs", "sequences", "maplabels", "interfaces")
 
 
@@ -70,7 +70,7 @@ def tool_trace(args):
     if got:
         out["fromClient"] = got
 
-    # outgoing: the params this thing carries, with whatever config each value names
+    # outgoing: the params this thing carries
     carries = []
     pu = c.execute("select param_id, int_value, str_value, target_type, target_name "
                    "from param_use where owner_type=? and owner_id=? order by param_id limit ?",
@@ -85,7 +85,7 @@ def tool_trace(args):
     if carries:
         out["carries"] = carries
 
-    # incoming: anything whose param value names this config. The edge stores a name, not an id.
+    # incoming: anything whose param value names this
     refs = []
     if row["name"]:
         for r in c.execute("select owner_type, owner_id, param_id from param_use "
@@ -114,9 +114,7 @@ def tool_trace(args):
                        "order by sprite_id, source limit ?", (t, row["id"], limit)).fetchall()
         if sp:
             extra["sprites"] = [{"sprite": r["sprite_id"], "via": r["source"]} for r in sp]
-    # Ordered because it is truncated. Without it the limit takes whatever rows the table happens
-    # to hold first, so a rebuild that inserts them in a different order silently returns a
-    # different set for the same question.
+    # ordered, because it is then truncated
     inenum = c.execute("select enum_id, key from enum_entry where value=? "
                        "order by enum_id, key limit ?",
                        (str(row["id"]), limit)).fetchall()
@@ -129,7 +127,7 @@ def tool_trace(args):
     if seen and seen(row["id"]):
         out["seenAt"] = seen(row["id"])
 
-    # the other direction on quests: which walkthroughs name this thing
+    # the other direction: which walkthroughs name this
     if t in ("npcs", "objects"):
         try:
             quests_using = addons.first("quests_using")
@@ -139,7 +137,7 @@ def tool_trace(args):
         except Exception:
             pass
 
-    # the family, so a child id does not look like a dead end
+    # the family, so a child is not lost
     try:
         from .families import tool_family
         fam = tool_family({"kind": kind, "id": str(row["id"])})

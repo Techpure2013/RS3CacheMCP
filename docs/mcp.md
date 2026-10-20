@@ -3,7 +3,8 @@
 [All docs](README.md) › How it works
 
 `rs3-mcp.py` is the server AI apps run. It only needs Python. Apps talk to it over MCP (protocol
-version 2025-06-18), sending JSON-RPC messages through stdin and stdout.
+version 2025-11-25, and the three before it), sending JSON-RPC messages through stdin and stdout.
+It has no `server/discover`, so apps on the 2026-07-28 spec fall back to the older handshake.
 
 It never changes your game data. The database is opened read-only, and `rs3_query` only accepts a
 single SELECT. Any tool that runs a program, saves a file or goes online is marked as doing so.
@@ -12,7 +13,12 @@ single SELECT. Any tool that runs a program, saves a file or goes online is mark
 
 **A short guide.** When an app connects, the server sends a guide to which tool to use for common
 jobs. It lives in `rs3mcp/howto.py`. Every tool it names is checked against the real tool list, so
-renaming a tool can't leave the guide pointing at nothing.
+renaming a tool can't leave the guide pointing at nothing. Claude Code keeps only the first 2,048
+characters, so the guide opens with a one-line-per-task index that fits, and the full procedures
+follow it and are the resource `rs3://guide/tools`.
+
+**A clean stdout.** While serving, only JSON-RPC goes to stdout. Anything else a tool prints, and
+anything a program it starts prints, lands on stderr instead.
 
 **Tools.** Apps get every tool in the groups `RS3_TOOLSETS` allows, with a description, its
 arguments, and hints about whether it only reads. `rs3_wiki` is marked as going online.

@@ -1,0 +1,72 @@
+[
+ {
+  "quote": "3.18 (Current)",
+  "claim": "The LSP spec site marks version 3.18 as the current specification version.",
+  "holds": 0.155737,
+  "features": [
+   -0.654707,
+   -0.654707,
+   0.760248,
+   0.166667,
+   0.0,
+   0.0,
+   1.665008
+  ]
+ },
+ {
+  "quote": "method: textDocument/didChange params: DidChangeTextDocumentParams defined as follows:",
+  "claim": "An open document's change is sent as the notification textDocument/didChange with params of type DidChangeTextDocumentParams.",
+  "holds": 0.469944,
+  "features": [
+   -1.588358,
+   -1.588358,
+   0.888262,
+   0.363636,
+   0.0,
+   0.0,
+   0.373966
+  ]
+ },
+ {
+  "quote": "The version number points * to the version after all provided content changes have * been applied.",
+  "claim": "DidChangeTextDocumentParams.textDocument is a VersionedTextDocumentIdentifier whose version is the version after all content changes in the notification are applied.",
+  "holds": 0.31108,
+  "features": [
+   0.320066,
+   0.320066,
+   0.626107,
+   0.5,
+   0.0,
+   1.098612,
+   0.520978
+  ]
+ },
+ {
+  "quote": "The actual content changes.",
+  "claim": "DidChangeTextDocumentParams carries contentChanges, an array of TextDocumentContentChangeEvent describing the actual content changes.",
+  "holds": 0.079179,
+  "features": [
+   -1.55313,
+   -1.55313,
+   0.700787,
+   0.333333,
+   0.0,
+   1.386294,
+   1.594512
+  ]
+ },
+ {
+  "quote": "contentChanges : TextDocumentContentChangeEvent [];",
+  "claim": "DidChangeTextDocumentParams.contentChanges is typed as an array of TextDocumentContentChangeEvent.",
+  "holds": 0.362348,
+  "features": [
+   -1.006582,
+   -1.006582,
+   0.927299,
+   0.4,
+   0.0,
+   0.693147,
+   0.653142
+  ]
+ }
+]
