@@ -7,4 +7,6 @@ group 60
 0x03 type            u8
 0x04 unk04           u8
 0x08 unk08           true
+# since the 2026-10-21 update (beta first): 09 6E 00 00 00 is this flag, then 0x6E's u16, then the end
+0x09 unk09           true
 0x6E unk6E           u16

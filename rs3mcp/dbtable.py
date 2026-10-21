@@ -1,7 +1,7 @@
 """The game's data tables, and the rows in them.
 
-387 tables holding 20,129 rows: currencies, cosmetics, farm paddocks, invention materials.
-Content that is not an item, npc or loc. Before the opcodes were worked out 13,777 were filed under
+391 tables holding 20,366 rows: currencies, cosmetics, farm paddocks, invention materials.
+Content that is not an item, npc or loc. Before the opcodes were worked out 13,977 were filed under
 the wrong table: the table id is a leb128, see rs3mcp/specs/dbrows.ops.
 
 Two things to know.
@@ -13,7 +13,7 @@ Column types stay numbers. Three are settled: 1 boolean, 9 packed interface comp
 The rest are not guessed at. Id spaces here overlap enough that a small column matches items, npcs
 and structs alike.
 
-The 26,677 strings in these rows are reachable from nothing else. text= searches them.
+The 26,957 strings in these rows are reachable from nothing else. text= searches them.
 
   rs3_dbtable   a table's columns and rows, a text search, or a packed dbcolumn split up
 """
@@ -172,7 +172,7 @@ def _name_of(c, tid):
 def _referenced_by(c, tid, limit=4):
     """Params typed as dbrow whose value is a row of this table, with what owns them.
 
-    The only handle on 114 of the 370 tables with rows: their rows carry no columns, just three
+    The only handle on 114 of the 374 tables with rows: their rows carry no columns, just three
     bytes naming the table. The meaning is in the param name, so objects.AGILITY_OBSTACLE_DBROW is
     what says table 97 is agility obstacles.
 

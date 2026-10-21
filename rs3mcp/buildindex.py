@@ -8,7 +8,7 @@ it in rs3-index.db. Every reader falls back to the slow path when the sidecar is
 means a stale or absent index degrades speed and never correctness.
 
 What it fixes: _item_family answered "who links to this item" with `data LIKE '%"noteLink":6,%'`
-once per field per suffix, sixteen full scans of 63,530 rows carrying JSON. That was 1.1 seconds on
+once per field per suffix, sixteen full scans of 63,936 rows carrying JSON. That was 1.1 seconds on
 every rs3_trace call. Precomputed it is a keyed lookup.
 """
 import io

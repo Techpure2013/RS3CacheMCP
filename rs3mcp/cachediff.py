@@ -8,7 +8,7 @@ how many rows moved, it is whether anything built against these ids went away.
   recoded   the config name moved, so anything matching by code name stops matching
   added     new content, and the reason the rebuild was worth doing
 
-Both are opened read only and joined in sqlite: 858,637 rows against 853,963 is not something to
+Both are opened read only and joined in sqlite: 864,212 rows against 853,963 is not something to
 pull into memory.
 
   rs3_cache_diff  what changed between the current database and the one before it

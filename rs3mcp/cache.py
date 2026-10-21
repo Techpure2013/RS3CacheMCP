@@ -40,7 +40,7 @@ Things that are easy to get wrong here:
   32741, just under the loc sentinel, which is presumably why the two differ at all.
 - The entity in the world carries the PARENT id. Anything naming the child matches nothing and
   says nothing, so rs3_lookup reports "parents" on a child and decodes "multiloc"
-  on a parent. 3,635 npc ids are children of something.
+  on a parent. 3,649 npc ids are children of something.
 - A field named unkXX is read correctly and not understood yet. Loc animation is the sequence id
   and loc quests the required quest ids; both are confirmed.
 - Items past 65535 use the tribyte families: stack1..9, and noteLink/noteTemplate, lentLink,
@@ -49,7 +49,7 @@ Things that are easy to get wrong here:
   in the cache links an npc to its shop, or gives a shop a location - that is server side.
 - Sprites carry a name hash, not a name. sprite_name holds the cracked ones, sprite_use holds
   everything that points at a sprite (interface components and params typed SPRITE), sprite_hash
-  holds all 36497 hashes.
+  holds all 36569 hashes.
 """
 
 

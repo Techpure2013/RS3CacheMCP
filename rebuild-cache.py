@@ -57,9 +57,14 @@ ASSET_MODES = ["clientscript", "sprites"]
 LIVE_STAGE = os.path.join(DATA, "rs3-cache-stage")
 
 # Types with a standing decode gap: a type listed here may fail up to its number, a type not listed
-# failing is what blocks an install. Every config, model, clientscript and sprite decodes today, so
-# the list is empty and any failure is new. Add one only after looking at what fails and why.
-KNOWN_UNDECODED = {}
+# failing is what blocks an install. Add one only after looking at what fails and why.
+KNOWN_UNDECODED = {
+    # since the 2026-10-21 update (beta first): one kind-13 component, interface 1578:11, sets a flag
+    # in byte 2 of its block that shortens the block to about 116 bytes and moves what follows. The
+    # other ten kind-13 components still read at 125. Remove once interfaces.ops reads it, checked
+    # against a qd ifacedump of interface 1578.
+    "interfaces": 1,
+}
 # a build's own standing gaps, with a _why
 _GAPS = os.path.join(DATA, "known-undecoded.json")
 if os.path.exists(_GAPS):

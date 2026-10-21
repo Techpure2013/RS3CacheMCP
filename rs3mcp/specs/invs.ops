@@ -6,3 +6,5 @@ group 5
 
 0x02 size            u16
 0x15 stock           list[u8]<{u24 item -> items; u16 quantity}>
+# since the 2026-10-21 update; no bytes of its own (nine invs end 18 00)
+0x18 unk18           true

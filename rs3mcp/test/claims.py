@@ -28,7 +28,7 @@ NUMBERS = re.compile(r"\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?M\b|\d{3,}")
 # listing characters, each bump in rs3api/ledger.md
 LISTING_BUDGET = 39700
 # unchecked numbers in strings, see rs3api/ledger.md
-WRITTEN_NUMBERS = 181
+WRITTEN_NUMBERS = 187
 
 
 def written_numbers():

@@ -17,7 +17,6 @@ On this page
 - [What it has cost](#what-it-has-cost)
 - [Where everything stands](#where-everything-stands)
 - [Checking an agent's work](#checking-an-agents-work)
-- [Keeping copies in step](#keeping-copies-in-step)
 
 Every command rs3cache has. Most of the time you'll only need `rs3` ([the rs3 command](cli.md)). The
 rest are for building by hand, digging into how the cache is read, testing, and drawing pictures.

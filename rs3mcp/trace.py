@@ -1,7 +1,7 @@
 """
 Everything that points at one config, and everything it points at.
 
-The data was always joinable and nothing joined it. param_use alone is 776,843 typed edges --
+The data was always joinable and nothing joined it. param_use alone is 780,961 typed edges --
 owner, param, value, and the config the value refers to when it refers to one -- and beside it sit
 enum_entry, sprite_use, model_use, inv_stock and loc_section.
 
