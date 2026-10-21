@@ -282,16 +282,6 @@ python -m rs3mcp.replay            what moved since the verdicts were recorded
 python -m rs3mcp.replay --record   record them, once you have read every change
 ```
 
-## Keeping copies in step
-
-```
-python sync.py [--pull | --push]           compares two copies of rs3cache, or copies one onto the other
-```
-
-`sync.py` is in the repo. It looks for your working copy in an `rs3cache` folder beside the repo, or
-wherever `RS3CACHE_LIVE` says. On its own, it just shows what's different. `--pull` copies your
-working copy into the repo, and `--push` copies the repo back.
-
 ---
 
 Previous: [The rs3 command](cli.md) · Next: [AI apps](apps.md)

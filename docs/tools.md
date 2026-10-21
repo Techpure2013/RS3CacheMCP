@@ -2,7 +2,7 @@
 
 [All docs](README.md) › Using it
 
-Every tool, in 5 groups. There are 16 in all. AI apps and the `rs3` command use the same tools. Apps see the full name, like `rs3_lookup`. In `rs3` you can leave off the `rs3_`.
+Every tool, in 6 groups. There are 30 in all. AI apps and the `rs3` command use the same tools. Apps see the full name, like `rs3_lookup`. In `rs3` you can leave off the `rs3_`.
 
 This page is written automatically by `rs3 docs`, so don't edit it by hand.
 
@@ -11,9 +11,10 @@ Every tool also takes `pick`, to get just one part of an answer (`pick=counts.np
 | Group | Tools |
 |---|---|
 | [cache](#cache) | [cache_diff](#cache_diff), [family](#family), [lookup](#lookup), [query](#query), [schema](#schema), [sprite](#sprite), [trace](#trace) |
-| [docs](#docs) | [wiki](#wiki) |
+| [docs](#docs) | [api](#api), [api_gotchas](#api_gotchas), [docs_check](#docs_check), [wiki](#wiki) |
 | [game](#game) | [dbtable](#dbtable), [iface](#iface), [var](#var) |
-| [meta](#meta) | [drift](#drift), [research](#research) |
+| [lua](#lua) | [lab_query](#lab_query), [lab_run](#lab_run), [lsp](#lsp), [lua](#lua-1), [lua_ast](#lua_ast), [lua_check](#lua_check), [lua_example](#lua_example), [plugin_lint](#plugin_lint) |
+| [meta](#meta) | [collision](#collision), [collision_export](#collision_export), [drift](#drift), [research](#research), [transport_candidates](#transport_candidates) |
 | [scripts](#scripts) | [script](#script), [script_read](#script_read), [script_refs](#script_refs) |
 
 ## cache
@@ -144,6 +145,39 @@ Over MCP: `{"name": "rs3_trace", "arguments": {"kind": "obj", "id": "2"}}`
 
 ## docs
 
+### api
+
+`rs3_api`, reads only, from the rs3api add-on.
+
+Find a class, interface, namespace or enum in the RS client API typings, or find everything that has a given member. Returns the declaration verbatim plus anything known to be wrong about it. Use member= to answer questions like which entities expose aabb.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `name` | string |  | type name, qualified or not, e.g. Sprite or ui.Sprite |
+| `member` | string |  | a property or method name to search for across all types |
+| `kind` | string |  | narrow to class, interface, namespace or enum |
+| `full` | boolean |  | return full declarations even for a wide search |
+
+### api_gotchas
+
+`rs3_api_gotchas`, reads only, from the rs3api add-on.
+
+Everything known to be wrong or surprising about the RS client API: properties that exist but are not declared, one that is documented and does not exist, units that differ from the rest of the api, and the crash shapes. Each with what was actually observed. Worth reading before trusting a typing.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `subject` | string |  | filter, e.g. aabb, sprite, facing, crash |
+
+### docs_check
+
+`rs3_docs_check`, reads only, from the rs3api add-on.
+
+Check the local docs mirror against the typings: which identifiers a page names that the typings do not declare, and how many pages record no source url so cannot be re-checked at all. Run before trusting a mirrored page for something that matters.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `page` | string |  | part of a page name, e.g. npclist |
+
 ### wiki
 
 `rs3_wiki`, reads only, reaches the network.
@@ -177,10 +211,10 @@ The game's data tables and their rows: currencies, farm paddocks, invention mate
 | `name` | string |  | table name, exact or partial |
 | `search` | string |  | list tables whose name contains this |
 | `rows` | string |  | true to include the table's rows |
-| `column` | string |  | a packed dbcolumn id, split into table and column |
+| `column` | string |  | a packed dbcolumn id to split |
 | `text` | string |  | find rows whose stored text contains this |
-| `drops` | string |  | true to list tables holding weighted drop tables, found by shape rather than name |
-| `all` | string |  | true to include the tables hidden by default from drops= and text=: monetised content, the rotating event schedule and tutorial prose |
+| `drops` | string |  | true to list weighted drop tables, found by shape |
+| `all` | string |  | true to include what drops= and text= hide: monetised, event schedule, tutorial prose |
 | `limit` | integer |  | max tables or rows, default 40 |
 
 ```
@@ -230,7 +264,191 @@ rs3 var id=-60893
 
 Over MCP: `{"name": "rs3_var", "arguments": {"id": "-60893"}}`
 
+## lua
+
+### lab_query
+
+`rs3_lab_query`, reads only, from the rs3api add-on.
+
+Ask a traced lab run: events, state, diff, why (exact line by replay), coverage, compare, break.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `run` | string | required | id from rs3_lab_run trace=true |
+| `op` | string | required | events\|state\|diff\|why\|coverage\|compare\|break |
+| `at` | integer |  | event number |
+| `path` | string |  | eg core/x.state.kills |
+| `from` | integer |  | event number |
+| `to` | integer |  | event number |
+| `file` | string |  | eg core/x.lua |
+| `other` | string |  | run id |
+| `when` | string |  | Lua condition, lab.get(path) reads state |
+| `show` | array |  | Lua expressions |
+| `start` | integer |  | paging |
+
+### lab_run
+
+`rs3_lab_run`, reads only, from the rs3api add-on.
+
+Run a Lua probe against a sandboxed copy of a plugin, loaded as the client loads it; lab.fire sends events.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `path` | string | required | the plugin folder |
+| `entry` | string |  | file to load first |
+| `script` | string |  | Lua; its return value is the result |
+| `seed` | integer |  | default 1 |
+| `seconds` | number |  | limit, default 5 |
+| `mb` | integer |  | limit, default 256 |
+| `trace` | boolean |  | for rs3_lab_query |
+| `model` | boolean |  | use the measured client |
+| `gaps` | boolean |  | list all gaps |
+
+```
+rs3 lab_run path=C:/Users/you/RS3Plugins/my-plugin script="return lab.require('core/textfmt').fmt(1234567)"
+```
+
+Over MCP: `{"name": "rs3_lab_run", "arguments": {"path": "C:/Users/you/RS3Plugins/my-plugin", "script": "return lab.require('core/textfmt').fmt(1234567)"}}`
+
+### lsp
+
+`rs3_lsp`, writes or runs something, from the rs3api add-on.
+
+What the language server says about a lua file, folder or workspace: fields that do not exist, nils never checked, unused locals. The half luac cannot see. Reports at Hint, because every higher level drops rows the editor shows and still returns a number that reads as an answer.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `path` | string | required | a .lua file or folder; checked from the nearest .luarc.json, rows filtered to it |
+| `level` | string |  | lowest level reported, Hint by default |
+| `refresh` | boolean |  | re-run even if nothing has changed |
+| `limit` | integer |  | rows to return, 60 by default |
+
+```
+rs3 lsp path=RS3Plugins/my-plugin
+```
+
+Over MCP: `{"name": "rs3_lsp", "arguments": {"path": "RS3Plugins/my-plugin"}}`
+
+### lua
+
+`rs3_lua`, reads only, from the rs3api add-on.
+
+Writing lua for the RS client: what the sandbox provides and withholds, the traps that have actually cost time, and working recipes for windows, events, world drawing, walking an interface and plugin resources. Call with no topic for the index.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `topic` | string |  | e.g. sandbox, pcall, events, window, drawing, resources, truthiness |
+
+### lua_ast
+
+`rs3_lua_ast`, reads only, from the rs3api add-on.
+
+Search lua by shape, not text. `pcall(function() $$$B end)` matches the call however the body is written. $X is one node, $$$X is several. rewrite= previews a replacement; only apply=true writes.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `pattern` | string | required | ast-grep pattern, $X and $$$X are holes |
+| `path` | string | required | a lua file or a folder |
+| `rewrite` | string |  | replacement, reusing the same holes |
+| `apply` | boolean |  | write it. Off by default, so you see first |
+| `limit` | integer |  | default 40 |
+| `start` | integer |  | pass the nextStart a paged answer gives |
+
+```
+rs3 lua_ast pattern="pcall(function() $$$B end)" path=RS3Plugins/my-plugin
+```
+
+Over MCP: `{"name": "rs3_lua_ast", "arguments": {"pattern": "pcall(function() $$$B end)", "path": "RS3Plugins/my-plugin"}}`
+
+### lua_check
+
+`rs3_lua_check`, reads only, from the rs3api add-on.
+
+Compile a lua file or folder with luac and flag the traps that compile fine and fail in the client. Run it before deploying.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `path` | string | required | a .lua file or a folder to walk |
+
+```
+rs3 lua_check path=RS3Plugins/my-plugin/main.lua
+```
+
+Over MCP: `{"name": "rs3_lua_check", "arguments": {"path": "RS3Plugins/my-plugin/main.lua"}}`
+
+### lua_example
+
+`rs3_lua_example`, reads only, from the rs3api add-on.
+
+Every real use of a symbol across the installed plugins, with surrounding lines. Use it to see how something is actually called before calling it.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `symbol` | string | required | e.g. ShapeList.Draw, RibbonBar.Register, aabb |
+| `limit` | integer |  | max examples, default 12 |
+| `context` | integer |  | lines either side, default 3 |
+
+### plugin_lint
+
+`rs3_plugin_lint`, reads only, from the rs3api add-on.
+
+Check a plugin.json against the manifests that are installed and working: keys the client will silently ignore, a dependency that is not installed so its global never appears, and an http permission with no urls block. Omit path to see the key vocabulary and the permissions actually in use.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `path` | string |  | a plugin.json, or the plugin folder holding one |
+
+```
+rs3 plugin_lint path=RS3Plugins/my-plugin
+```
+
+Over MCP: `{"name": "rs3_plugin_lint", "arguments": {"path": "RS3Plugins/my-plugin"}}`
+
 ## meta
+
+### collision
+
+`rs3_collision`, reads only.
+
+An area's walkability as a grid, with doors, openings, transports and sealed doors marked on it. Use it to see why a route is blocked, or what a tile is shut in by.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `x` | integer | required | world x at the centre |
+| `z` | integer | required | world z at the centre |
+| `plane` | integer |  | 0 to 3, default 0 |
+| `size` | integer |  | tiles a side, 1 to 128, default 32 |
+| `destinations` | boolean |  | look each transport's far end up in the questbuddy transports table. Off by default: it is 200ms over the tunnel, and the cache itself does not hold a far end |
+| `root` | string |  | a cache folder other than the live one |
+
+```
+rs3 collision x=3222 z=3218
+rs3 collision x=3222 z=3218 plane=1 size=48
+```
+
+Over MCP: `{"name": "rs3_collision", "arguments": {"x": 3222, "z": 3218}}`
+
+### collision_export
+
+`rs3_collision_export`, reads only.
+
+One mapsquare's collision in a form a project can carry: one byte a tile, run-length encoded, plus the doors, openings, transports and sealed doors on it. Pass outDir to write it instead of returning the bytes.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `square_x` | integer | required | mapsquare x, world x divided by 64 |
+| `square_z` | integer | required | mapsquare z, world z divided by 64 |
+| `plane` | integer |  | 0 to 3, default 0 |
+| `outDir` | string |  | write a json file here and leave out the bytes |
+| `destinations` | boolean |  | look each transport's far end up in the questbuddy transports table, 200ms over the tunnel |
+| `root` | string |  | a cache folder other than the live one |
+
+```
+rs3 collision_export square_x=50 square_z=50
+rs3 collision_export square_x=50 square_z=50 outDir=out/collision
+```
+
+Over MCP: `{"name": "rs3_collision_export", "arguments": {"square_x": 50, "square_z": 50}}`
 
 ### drift
 
@@ -266,6 +484,28 @@ rs3 research q="how LSP reports a file edit"
 ```
 
 Over MCP: `{"name": "rs3_research", "arguments": {"q": "how LSP reports a file edit"}}`
+
+### transport_candidates
+
+`rs3_transport_candidates`, reads only.
+
+Work out where each stair, ladder and trapdoor in a box of mapsquares takes you, from the mate on the far plane and the model's own slope. Answers are candidates for a person to check, and say which were unclear.
+
+| Argument | Type | | What |
+|---|---|---|---|
+| `square_x` | integer | required | mapsquare x, world x divided by 64 |
+| `square_z` | integer | required | mapsquare z, world z divided by 64 |
+| `to_square_x` | integer |  | far corner x, default the same square |
+| `to_square_z` | integer |  | far corner z, default the same square |
+| `outDir` | string |  | write a json file here instead of sampling |
+| `root` | string |  | a cache folder other than the live one |
+
+```
+rs3 transport_candidates square_x=50 square_z=50
+rs3 transport_candidates square_x=49 square_z=49 to_square_x=51 to_square_z=51 outDir=out/transports
+```
+
+Over MCP: `{"name": "rs3_transport_candidates", "arguments": {"square_x": 50, "square_z": 50}}`
 
 ## scripts
 

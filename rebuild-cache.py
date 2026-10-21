@@ -416,6 +416,10 @@ def main():
     say("rebuilt and installed in %.1fs" % (time.time() - start))
     say("checking what the rebuild moved")
     timed("checks", after)
+    # what add-ons do after a rebuild: rs3api refreshes the api docs and Lua typings
+    from rs3mcp import addons
+    for step in addons.every("after_rebuild"):
+        timed(step.__name__, step)
     return 0
 
 

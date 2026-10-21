@@ -53,6 +53,40 @@ Plain words usually just work. Add `--json` if you want the raw answer.
 The database is a normal SQLite file at `data/rs3-cache.db`, so you can also open it in DB Browser
 for SQLite or your own scripts.
 
+## Writing plugins
+
+rs3cache also carries the RuneScape client's plugin API, for writing plugins in Lua:
+
+- **The docs**, fetched from [developer.runescape.com](https://developer.runescape.com/rs/getting-started.html)
+  into `data/api-docs`. A fetch asks for one page a second, and a page that hasn't changed costs
+  only its headers. `rs3 rebuild` refreshes them, or run `python rs3api/docsfetch.py`.
+- **Lua typings** generated from those docs, in `data/api-typings`, for the Lua language server
+  (LuaLS). Each refresh says what was added, removed or changed. Point your plugin at them with a
+  `.luarc.json` in its folder:
+
+      {
+        "runtime.version": "Lua 5.4",
+        "workspace.library": ["C:/path/to/rs3cache/data/api-typings"]
+      }
+
+- **Your own additions** go in `data/api-typings/extras/*.lua`, as LuaLS `---@meta` files. A
+  refresh never touches that folder, and the tools below read it too.
+
+The tools that go with it:
+
+    rs3 api Inventory            the declaration, with anything observed that the docs don't say
+    rs3 lua_check <folder>       checks a plugin: it compiles, calls use a dot or a colon as declared,
+                                 and the sandbox traps luac can't see
+    rs3 lsp <folder>             what the Lua language server says, counted properly; a plugin
+                                 with no .luarc.json is checked against the typings above
+    rs3 plugin_lint <plugin.json>  the manifest: keys the client ignores, missing dependencies
+    rs3 lab_run <folder>         runs Lua against a copy of a plugin in a sandbox shaped like the client
+    rs3 lua_ast "<pattern>"      searches Lua by shape rather than by text
+
+These need some programs: `lua-language-server` for `lsp`, `luac` for `lua_check`, `node` for
+`lua_ast`, and Lua 5.4 for `lab_run` (on PATH, or set `RS3_LUA54`). `rs3 doctor` says which you
+have.
+
 ## AI apps
 
 | App | `rs3 setup` name | Where it's added |
@@ -100,15 +134,13 @@ running `rs3 setup`, setup copies them into your app's config.
 | `RS3_TOOLSETS` | shows apps only some groups of tools, e.g. `cache,scripts` |
 | `RS3_MONITOR` | `off` turns the scrying pool off |
 | `RS3_MONITOR_PORT` | the scrying pool's port. The default is 7331 |
+| `RS3_PLUGINS` | where your installed plugins are, if not in `~\RS3Plugins` |
+| `RS3_LUA54` | the Lua 5.4 interpreter for `lab_run`, if it's not on PATH |
 
 ## For developers
 
-rs3cache runs from a working copy in an `rs3cache` folder beside this repo (or wherever
-`RS3CACHE_LIVE` says). This repo is the copy kept on GitHub, and `sync.py` keeps the two matching:
-
-    python sync.py          shows what's different
-    python sync.py --pull   copies the working copy in here
-    python sync.py --push   copies this back to the working copy
+rs3cache runs from this folder. The repo holds only what's named in `.gitignore`: everything else
+here, the data included, stays on your machine. To add a file to the repo, name it there.
 
 To test, run `python rs3-mcp.py --selftest`. Tests that need something you don't have are skipped,
 and it tells you which.

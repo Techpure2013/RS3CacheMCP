@@ -72,5 +72,8 @@ def families():
 
 
 def private_modules():
-    """Module name prefixes of the add-ons marked PRIVATE."""
-    return tuple(pkg.__name__ + "." for pkg in load() if getattr(pkg, "PRIVATE", None))
+    """Module name prefixes kept out of the docs: an add-on marked PRIVATE whole, and the modules
+    one names in PRIVATE_MODULES."""
+    out = [pkg.__name__ + "." for pkg in load() if getattr(pkg, "PRIVATE", None)]
+    out += [pkg.__name__ + "." + m for pkg in load() for m in getattr(pkg, "PRIVATE_MODULES", ())]
+    return tuple(out)
