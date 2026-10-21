@@ -645,7 +645,8 @@ def tool_lua_check(args):
         elif rel not in bad and not any(s["file"] == rel for s in shapes):
             clean += 1
 
-    out = {"checked": len(files), "compiles": len(files) - len(broken), "clean": clean,
+    # without luac nothing was compiled, so no count of what compiles
+    out = {"checked": len(files), "compiles": len(files) - len(broken) if luac else None, "clean": clean,
            "willNotCompile": broken[:20],
            "sandbox": warned[:20],
            # calls read against their declarations
