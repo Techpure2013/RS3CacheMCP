@@ -1817,6 +1817,32 @@ def test_stack_context_sets_aside_unread():
     shutil.rmtree(folder, ignore_errors=True)
 
 
+def test_stack_ties_two_unknowns():
+    """The second crash after the 2026-10-21 update: a script with two ops the map lacked reached
+    the stack check with a two-unknown guess, and its loop unpacked None. Two rare ops that share a
+    script, taken out of this cache's map, have to come back with their widths."""
+    import collections
+    from rs3mcp import clientscript as cs, cscalibrate as C
+
+    full = cs.load_map()
+    new = dict(cs.scripts())
+    uses, together = collections.Counter(), collections.defaultdict(set)
+    for sid, raw in new.items():
+        nums = {(raw[p] << 8) | raw[p + 1] for p in C._opcode_fields(raw, full) or []}
+        uses.update(nums)
+        for n in nums:
+            together[n].add(sid)
+    rare = sorted((n for n, k in uses.items() if 2 <= k <= 6), key=lambda n: uses[n])
+    pair = next(((a, b) for i, a in enumerate(rare) for b in rare[i + 1:] if together[a] & together[b]), None)
+    if pair is None:
+        check("stack ties: the cache has two rare ops in one script", None, "a pair")
+        return
+    known = {n: v for n, v in full.items() if n not in pair}
+    C.stack_ties(known, {n: n for n in known}, new, say=lambda msg: None)
+    check("stack ties: two unknowns in one script come back with their widths",
+          {n: (known.get(n) or (None, None))[1] for n in pair}, {n: full[n][1] for n in pair})
+
+
 def test_calibration():
     """An update's opcode numbers, got back from a scrambled copy of this cache.
 
@@ -3242,7 +3268,7 @@ TESTS = [test_everything_compiles, test_escape_guard, test_brief_features_logged
          test_toolset_file, test_toolsets, test_spill_and_brief, test_answer_size, test_resources,
          test_continuation, test_protocol, test_claims,
          test_drift_runs, test_scan_cache, test_script_index, test_vars, test_iface,
-         test_cache, test_index, test_invariants, test_opcode_specs, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_calibration, test_script_names, test_cross_tool, test_regressions]
+         test_cache, test_index, test_invariants, test_opcode_specs, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_calibration, test_script_names, test_cross_tool, test_regressions]
 
 
 _TIMES = []

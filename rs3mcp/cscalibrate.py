@@ -461,7 +461,8 @@ def stack_ties(known, pairs, new, say=print):
             ctx.code[sid], ctx.heads[sid] = head.pop("code"), head
             code = list(ctx.code[sid])
             verdict = "wrong"
-            for pops, pushes in effects if len(guess) == 1 else [None]:
+            # one unknown: try each effect it could have; several: simulate once, none assumed
+            for pops, pushes in effects if len(guess) == 1 else [(None, None)]:
                 if pops is not None:
                     ctx.fixed[NEW_OP + next(iter(guess))] = (pops, pushes)
                 try:
