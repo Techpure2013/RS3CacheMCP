@@ -441,7 +441,8 @@ def stack_ties(known, pairs, new, say=print):
         path = os.path.join(tmp, "opmap.json")
         shutil.copyfile(cs.OPMAP, path)
         save_map(trial, pairs, path=path)
-        ctx = st.Context(path)
+        # scripts no reading was found for still don't read: settle what does
+        ctx = st.Context(path, skip_unread=True)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     st.settle(ctx)

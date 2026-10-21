@@ -60,7 +60,9 @@ def prim(t):
 class Context:
     """The data dynamic ops depend on, read from the cache through our specs."""
 
-    def __init__(self, opmap_path=cs.OPMAP):
+    def __init__(self, opmap_path=cs.OPMAP, skip_unread=False):
+        """skip_unread: a script that doesn't read under this map is left out (self.unread) rather
+        than raising. Calibration's trial maps leave some unread; a finished map must read all."""
         raw = json.load(io.open(opmap_path, encoding="utf-8"))["ops"]
         self.opmap = {int(k): (v["op"], v["imm"]) for k, v in raw.items()}
         self.fixed = {v["op"]: (v["in"], v["out"]) for v in raw.values()
@@ -90,8 +92,15 @@ class Context:
                 self.columns[(tid, col["id"])] = col["types"]
         self.heads = {}
         self.code = {}
+        self.unread = []
         for sid, data in cs.scripts():
-            head = cs.read(data, self.opmap)
+            try:
+                head = cs.read(data, self.opmap)
+            except cs.Bad:
+                if not skip_unread:
+                    raise
+                self.unread.append(sid)
+                continue
             self.code[sid] = head.pop("code")
             self.heads[sid] = head
         # what each script leaves for its caller
@@ -151,6 +160,9 @@ def effect(ctx, op, imm, stack):
         return ([], [prim(t)]) if op == OP["push_var"] else ([prim(t)], [])
     if op == OP["gosub"]:
         head = ctx.heads.get(imm)
+        if head is None and imm in ctx.unread:
+            # exists, but doesn't read under this trial map: unknown, not wrong
+            raise Stuck("call to unread script %d" % imm)
         if head is None:
             raise Wrong("call to script %d, which does not exist" % imm)
         if imm not in ctx.returns:

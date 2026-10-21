@@ -1779,6 +1779,44 @@ def test_likeliest():
           max(sum(1 for t in pops if t == st.I) for pops, _ in C._effects()), 5)
 
 
+def test_stack_context_sets_aside_unread():
+    """A rebuild after the 2026-10-21 update died in calibration: its trial map left 47 scripts
+    unread, and the stack check read every script with it. The trial sets those aside; a finished
+    map still has to read them all."""
+    import collections
+    import json as js
+    import shutil
+    from rs3mcp import clientscript as cs, csstack as st
+
+    raw = js.load(io.open(cs.OPMAP, encoding="utf-8"))
+    opmap = {int(k): (v["op"], v["imm"]) for k, v in raw["ops"].items()}
+    used = collections.Counter()
+    for _sid, data in cs.scripts():
+        try:
+            used.update(op for op, _ in cs.read(data, opmap)["code"])
+        except cs.Bad:
+            pass
+    by_name = {v[0]: k for k, v in opmap.items()}
+    rare = next((op for op, n in sorted(used.items(), key=lambda x: x[1]) if 3 <= n <= 40 and op in by_name), None)
+    if rare is None:
+        check("stack context: the cache has an opcode few scripts use", None, "one")
+        return
+    folder = tempfile.mkdtemp()
+    path = os.path.join(folder, "opmap.json")
+    js.dump(dict(raw, ops={k: v for k, v in raw["ops"].items() if int(k) != by_name[rare]}),
+            io.open(path, "w", encoding="utf-8"))
+    try:
+        st.Context(path)
+        raised = False
+    except cs.Bad:
+        raised = True
+    check("stack context: a finished map that misses an opcode still raises", raised, True)
+    ctx = st.Context(path, skip_unread=True)
+    check("stack context: a trial map sets those scripts aside", (len(ctx.unread) > 0, len(ctx.code) > 20000), (True, True),
+          "%d aside, %d read" % (len(ctx.unread), len(ctx.code)))
+    shutil.rmtree(folder, ignore_errors=True)
+
+
 def test_calibration():
     """An update's opcode numbers, got back from a scrambled copy of this cache.
 
@@ -3204,7 +3242,7 @@ TESTS = [test_everything_compiles, test_escape_guard, test_brief_features_logged
          test_toolset_file, test_toolsets, test_spill_and_brief, test_answer_size, test_resources,
          test_continuation, test_protocol, test_claims,
          test_drift_runs, test_scan_cache, test_script_index, test_vars, test_iface,
-         test_cache, test_index, test_invariants, test_opcode_specs, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_calibration, test_script_names, test_cross_tool, test_regressions]
+         test_cache, test_index, test_invariants, test_opcode_specs, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_calibration, test_script_names, test_cross_tool, test_regressions]
 
 
 _TIMES = []
