@@ -60,6 +60,34 @@ def _workspace(path):
         at = up
 
 
+def _plugin(path, top):
+    """The plugin folder holding path, the nearest with a plugin.json below top, or None.
+
+    Plugins require from their own folder (`core/json`), so one checks on its own against the
+    workspace's settings, instead of LuaLS reading every plugin in the project."""
+    at = os.path.abspath(path if os.path.isdir(path) else os.path.dirname(path))
+    while at != top and at.startswith(top + os.sep):
+        if os.path.exists(os.path.join(at, "plugin.json")):
+            return at
+        at = os.path.dirname(at)
+    return None
+
+
+def _borrowed(rc, out):
+    """rc's settings written to out, its library folders made absolute so they still resolve
+    from another workspace."""
+    got = json.load(io.open(rc, encoding="utf-8"))
+    base = os.path.dirname(rc)
+
+    def fix(libs):
+        return [p if os.path.isabs(p) else os.path.normpath(os.path.join(base, p)) for p in libs]
+    if isinstance(got.get("workspace.library"), list):
+        got["workspace.library"] = fix(got["workspace.library"])
+    if isinstance(got.get("workspace"), dict) and isinstance(got["workspace"].get("library"), list):
+        got["workspace"]["library"] = fix(got["workspace"]["library"])
+    json.dump(got, io.open(out, "w", encoding="utf-8"))
+
+
 def _stamp(root):
     """Size and mtime of every lua file under the workspace, as one digest.
 
@@ -126,16 +154,21 @@ def typings():
     return docstypes.OUT if glob.glob(os.path.join(docstypes.OUT, "*.lua")) else None
 
 
-def run(root, level="Hint", library=None):
+def run(root, level="Hint", library=None, rc=None):
     """Check one workspace and cache what came back. `library`: a folder of typings to check
-    against when the workspace has no .luarc.json of its own."""
+    against when the workspace has no .luarc.json of its own. `rc`: a .luarc.json above root
+    to check it with."""
     server = _server()
     if server is None:
         raise RuntimeError("lua-language-server is not on PATH")
     stamp = _stamp(root)
     with tempfile.TemporaryDirectory() as log:
         cmd = [server, "--check", root, "--checklevel=" + level, "--logpath=" + log]
-        if library:
+        if rc:
+            config = os.path.join(log, "luarc.json")
+            _borrowed(rc, config)
+            cmd.append("--configpath=" + config)
+        elif library:
             config = os.path.join(log, "luarc.json")
             json.dump({"runtime.version": "Lua 5.4", "workspace.library": [library]}, io.open(config, "w", encoding="utf-8"))
             cmd.append("--configpath=" + config)
@@ -211,11 +244,15 @@ def tool_lsp(args):
 
     root, configured = _workspace(target)
     library = None if configured else typings()
+    rc = None
+    plugin = _plugin(target, root) if configured else None
+    if plugin:
+        rc, root = os.path.join(root, ".luarc.json"), plugin
     got = None if args.get("refresh") else read_cache(root)
     reused = (got is not None and not got.get("stale") and got.get("level") == level
               and got.get("library") == library)
     if not reused:
-        got = run(root, level, library)
+        got = run(root, level, library, rc)
 
     rows = _under(got["rows"], root, target)
     skipped = [r for r in rows if any(s in "/" + r["file"] for s in NOT_YOURS)]
@@ -266,6 +303,7 @@ def note_for(path):
             return {"ran": False,
                     "problem": "no .luarc.json above this path, so LuaLS has nothing to check "
                                "against. Every client global would read as undefined."}
+        root = _plugin(path, root) or root
         got = read_cache(root)
         if got is None:
             return {"ran": False, "workspace": os.path.abspath(root).replace("\\", "/"),
@@ -292,7 +330,8 @@ TOOLS = [
      "description": "What the language server says about a lua file, folder or workspace: fields "
                     "that do not exist, nils never checked, unused locals. The half luac cannot "
                     "see. Reports at Hint, because every higher level drops rows the editor "
-                    "shows and still returns a number that reads as an answer.",
+                    "shows and still returns a number that reads as an answer. A path inside a "
+                    "plugin checks only that plugin, with the project's .luarc.json.",
      "inputSchema": {"type": "object", "required": ["path"], "properties": {
          "path": {"type": "string",
                   "description": "a .lua file or folder; checked from the nearest .luarc.json, "
