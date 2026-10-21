@@ -29,9 +29,9 @@ from bs4 import BeautifulSoup, NavigableString
 ROOT = "https://developer.runescape.com/rs/"
 START = ROOT + "getting-started.html"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from rs3mcp.common import ROOT  # noqa: E402  run as a script, rs3cache isn't on the path
+from rs3mcp import common  # noqa: E402  run as a script, rs3cache isn't on the path
 
-OUT = os.path.join(ROOT, "api-docs")
+OUT = os.path.join(common.ROOT, "api-docs")
 # each page's ETag and the links it had, so an unchanged page needn't be downloaded to be crawled
 SEEN = os.path.join(OUT, ".seen.json")
 AGENT = "rs3cache-docs-mirror/1.0 (one request a second, unchanged pages skipped)"
