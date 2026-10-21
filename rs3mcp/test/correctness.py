@@ -1843,6 +1843,37 @@ def test_stack_ties_two_unknowns():
           {n: (known.get(n) or (None, None))[1] for n in pair}, {n: full[n][1] for n in pair})
 
 
+def test_stack_ties_ops_of_one_script():
+    """The last script unread after the 2026-10-21 update, 21183, had six ops no other script
+    uses and twenty readings that all looked alike. The script with the most such ops, up to the
+    six a reading is searched for, taken out
+    of this cache's map, has to come back with every width."""
+    import collections
+    from rs3mcp import clientscript as cs, cscalibrate as C
+
+    full = cs.load_map()
+    new = dict(cs.scripts())
+    owners = collections.defaultdict(set)
+    for sid, raw in new.items():
+        for p in C._opcode_fields(raw, full) or []:
+            owners[(raw[p] << 8) | raw[p + 1]].add(sid)
+    own = collections.defaultdict(set)
+    for n, sids in owners.items():
+        if len(sids) == 1:
+            own[next(iter(sids))].add(n)
+    # past UNKNOWNS no reading is searched for
+    sid = max((s for s in own if len(own[s]) <= C.UNKNOWNS), key=lambda s: len(own[s]), default=None)
+    if sid is None or len(own[sid]) < 3:
+        check("stack ties: a script has three ops of its own", None, "one")
+        return
+    known = {n: v for n, v in full.items() if n not in own[sid]}
+    pairs = {n: n for n in known}
+    while C.stack_ties(known, pairs, new, say=lambda msg: None):
+        pass
+    check("stack ties: the ops only script %d uses come back with their widths" % sid,
+          {n: (known.get(n) or (None, None))[1] for n in own[sid]}, {n: full[n][1] for n in own[sid]})
+
+
 def test_calibration():
     """An update's opcode numbers, got back from a scrambled copy of this cache.
 
@@ -1866,9 +1897,10 @@ def test_calibration():
         used.update((raw[p] << 8) | raw[p + 1] for p in C._opcode_fields(raw, truth) or [])
     check("calibration: every number in use comes back", sorted(n for n in used if known.get(n) != truth[n]), [])
     check("calibration: and every script reads with them", report["unread"], 0)
+    # only the numbers the sample uses
     check("calibration: the two new ops are found, with their widths",
-          sorted(v for n, v in known.items() if v[0] >= C.NEW_OP),
-          sorted(v for v in truth.values() if v[0] >= C.NEW_OP))
+          sorted(known[n] for n in used if n in known and known[n][0] >= C.NEW_OP),
+          sorted(truth[n] for n in used if truth[n][0] >= C.NEW_OP))
 
     tmp = tempfile.mkdtemp()
     try:
@@ -3268,7 +3300,7 @@ TESTS = [test_everything_compiles, test_escape_guard, test_brief_features_logged
          test_toolset_file, test_toolsets, test_spill_and_brief, test_answer_size, test_resources,
          test_continuation, test_protocol, test_claims,
          test_drift_runs, test_scan_cache, test_script_index, test_vars, test_iface,
-         test_cache, test_index, test_invariants, test_opcode_specs, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_calibration, test_script_names, test_cross_tool, test_regressions]
+         test_cache, test_index, test_invariants, test_opcode_specs, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_calibration, test_script_names, test_cross_tool, test_regressions]
 
 
 _TIMES = []

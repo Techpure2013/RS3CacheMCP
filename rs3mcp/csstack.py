@@ -205,7 +205,9 @@ def effect(ctx, op, imm, stack):
         raise Stuck("db find column not constant")
     got = ctx.fixed.get(op) or ctx.guess.get(op)
     if got is None:
-        raise Stuck("no effect for op %d" % op)
+        e = Stuck("no effect for op %d" % op)
+        e.op = op
+        raise e
     pops, pushes = got
     if "vararg" in pops:
         at = pops.index("vararg")
@@ -218,8 +220,9 @@ def _hooklike(ctx, stack):
     """What an unknown op would pop as a hook setter, if the stack in front looks like one.
 
     That is a signature string on top, or under one int for the IF form, with the args it names
-    below and a script id under those. Ints left under the script id are the op's own, pushed
-    first, as in `50, script, x, y, "ii"`. Returns (shape, pops) or None."""
+    below and a script id under those, or -1 under an empty one. Ints left under the script id
+    are the op's own, pushed first, as in `50, script, x, y, "ii"`. Returns (shape, pops) or
+    None."""
     def top(kind, n=0):
         seen = [e for e in stack if e[0] == kind]
         if len(seen) <= n:
@@ -238,7 +241,8 @@ def _hooklike(ctx, stack):
             script = top(I, above + args.count(I))
         except (Wrong, Stuck):
             return None
-        if script in ctx.code:
+        # -1 with no signature clears the hook
+        if script in ctx.code or script == -1 and sig == "":
             first = len([k for k, _ in stack if k == I]) - 1 - above - args.count(I)
             return [I] * first + [I, "vararg"] + [I] * above, [I] * (first + 1) + args + [I] * above
     return None
@@ -295,10 +299,13 @@ def targets(code, i):
     return [i + 1]
 
 
-def simulate(ctx, sid, samples=None):
+def simulate(ctx, sid, samples=None, stuck=None):
     """The stack at every instruction, and the types the script returns.
 
-    samples, when given, collects the stack depths in front of every op infer() is guessing."""
+    samples, when given, collects the stack depths in front of every op infer() is guessing.
+    stuck, when given, collects each Stuck and drops only that path, so the rest still gets
+    checked. Every ret returns the same types, so one ret reached gives them; with none reached
+    the returns are None."""
     code, head = ctx.code[sid], ctx.heads[sid]
     at = {0: []}
     work = [0]
@@ -321,6 +328,11 @@ def simulate(ctx, sid, samples=None):
         try:
             pops, pushes = effect(ctx, op, imm, stack)
             apply(stack, pops, pushes, op)
+        except Stuck as e:
+            if stuck is None:
+                raise
+            stuck.append(e)
+            continue
         except Wrong as e:
             raise Wrong("%s, at %d" % (e, i))
         for kind in pushes:
@@ -336,14 +348,17 @@ def simulate(ctx, sid, samples=None):
                 continue
             at[n] = list(stack)
             work.append(n)
+    if returns is None and stuck:
+        return at, None
     return at, returns or ()
 
 
 
-def settle(ctx, samples=None, dirty=None):
+def settle(ctx, samples=None, dirty=None, partial=False):
     """Simulate every script once, callees before callers.
 
     A script that fails leaves no returns, so its callers are stuck rather than wrong on a guess.
+    partial keeps the returns of a script stuck on some paths when another reaches a ret.
     Scripts in a call cycle go last, and stay stuck unless another path settles them.
     Returns ({script: Wrong}, {script: Stuck})."""
     callees = {sid: {imm for op, imm in code if op == OP["gosub"] and imm != sid and imm in ctx.code}
@@ -361,9 +376,13 @@ def settle(ctx, samples=None, dirty=None):
         # depths only count from a script that simulates
         seen = collections.defaultdict(list) if samples is not None else None
         try:
-            ctx.returns[sid] = simulate(ctx, sid, seen)[1]
+            paths = [] if partial else None
+            got = simulate(ctx, sid, seen, paths)[1]
+            if got is None:
+                raise paths[0]
+            ctx.returns[sid] = got
             stuck.pop(sid, None)
-            into = samples
+            into = dirty if paths else samples
         except Stuck as e:
             stuck[sid] = e
             into = dirty
@@ -460,22 +479,7 @@ def infer(ctx, rounds=8, say=None):
         depths = collections.defaultdict(list)
         for sid, code in ctx.code.items():
             _statements(ctx, sid, code, nets, depths)
-        solved = 0
-        for key, votes in nets.items():
-            got = votes.most_common(1)[0][0]
-            if key[0] == "ret":
-                if key[1] in ctx.returns or min(got) < 0:
-                    continue
-                ctx.returns[key[1]] = tuple([I] * got[0] + [L] * got[1] + [S] * got[2])
-            else:
-                if key[1] in ctx.guess:
-                    continue
-                seen = depths.get(key) or [(0, 0, 0)]
-                pops = tuple(max(min(d[k] for d in seen), -got[k]) for k in range(3))
-                pushes = tuple(p + n for p, n in zip(pops, got))
-                ctx.guess[key[1]] = ([I] * pops[0] + [L] * pops[1] + [S] * pops[2],
-                                     [I] * pushes[0] + [L] * pushes[1] + [S] * pushes[2])
-            solved += 1
+        solved = _take(ctx, nets, depths)
         if not solved:
             break
         wrong, stuck = settle(ctx)
@@ -488,6 +492,48 @@ def infer(ctx, rounds=8, say=None):
     guess_rest(ctx, say)
     trim(ctx, say)
     return dict(ctx.guess)
+
+
+def _take(ctx, nets, depths, only=None):
+    """The majority of each unknown's votes into ctx.guess or ctx.returns, for the ops in only
+    when it is given. Returns how many were solved."""
+    solved = 0
+    for key, votes in nets.items():
+        got = votes.most_common(1)[0][0]
+        if key[0] == "ret":
+            if only is not None or key[1] in ctx.returns or min(got) < 0:
+                continue
+            ctx.returns[key[1]] = tuple([I] * got[0] + [L] * got[1] + [S] * got[2])
+        else:
+            if key[1] in ctx.guess or only is not None and key[1] not in only:
+                continue
+            seen = depths.get(key) or [(0, 0, 0)]
+            pops = tuple(max(min(d[k] for d in seen), -got[k]) for k in range(3))
+            pushes = tuple(p + n for p, n in zip(pops, got))
+            ctx.guess[key[1]] = ([I] * pops[0] + [L] * pops[1] + [S] * pops[2],
+                                 [I] * pushes[0] + [L] * pushes[1] + [S] * pushes[2])
+        solved += 1
+    return solved
+
+
+def own_effects(ctx, sid, ops):
+    """Guesses for ops, the unknowns of one script, from that script alone: its statements' votes,
+    then guess_rest's shapes for any still sharing a statement, then the votes again."""
+    def vote():
+        while True:
+            nets = collections.defaultdict(collections.Counter)
+            depths = collections.defaultdict(list)
+            _statements(ctx, sid, ctx.code[sid], nets, depths)
+            if not _take(ctx, nets, depths, only=ops):
+                return
+    vote()
+    votes = collections.defaultdict(collections.Counter)
+    _greedy(ctx, sid, ctx.code[sid], cs.names(), votes)
+    for op, v in votes.items():
+        if op in ops and op not in ctx.guess:
+            pops, pushes = v.most_common(1)[0][0]
+            ctx.guess[op] = (list(pops), list(pushes))
+    vote()
 
 
 def trim(ctx, say=None):

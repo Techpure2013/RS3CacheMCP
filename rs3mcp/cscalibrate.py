@@ -411,6 +411,56 @@ def _effects():
     return out
 
 
+def new_effects(ctx, effects, skip=(), say=print):
+    """Stack effects for new ops that have a width but no effect yet, from the readable scripts
+    that use them: the one effect under which the most of them run clean, none wrong. Without it
+    a script whose readings differ further on is stuck at the first such op (21183 at 757, the
+    2026-10-21 update). Runs again while it settles something, since one op's effect can unstick
+    another's scripts. Returns how many were settled.
+
+    The hook setter shapes are tried too, so a hook op ties rather than settling on whatever
+    fixed effect its one script happens to allow."""
+    from rs3mcp import csstack as st
+    effects = list(effects) + [([st.I, "vararg"], []), ([st.I, "vararg", st.I], [])]
+    settled = 0
+    while True:
+        users = collections.defaultdict(list)
+        for sid, code in ctx.code.items():
+            if sid in skip:
+                continue
+            for op, _imm in code:
+                if op >= NEW_OP and op not in ctx.fixed and op not in ctx.guess and sid not in users[op]:
+                    users[op].append(sid)
+        moved = 0
+        for op, sids in sorted(users.items()):
+            scores = []
+            for pops, pushes in effects:
+                ctx.fixed[op] = (pops, pushes)
+                clean = 0
+                try:
+                    for sid in sids:
+                        stuck = []
+                        st.simulate(ctx, sid, stuck=stuck)
+                        clean += not stuck
+                except st.Wrong:
+                    continue
+                scores.append((clean, (pops, pushes)))
+            del ctx.fixed[op]
+            # sole survivor, else most clean
+            best = max((c for c, _e in scores), default=0)
+            winners = [e for c, e in scores if len(scores) == 1 or best and c == best]
+            if len(winners) == 1:
+                ctx.fixed[op] = winners[0]
+                moved += 1
+                say("calibration: new op %d takes %s and gives %s, from %d scripts that use it"
+                    % (op - NEW_OP, winners[0][0], winners[0][1], best))
+        settled += moved
+        if not moved:
+            return settled
+        # fresh returns for their callers
+        st.settle(ctx, partial=True)
+
+
 def stack_ties(known, pairs, new, say=print):
     """Widths for scripts with more than one reading, from which one the stacks allow.
 
@@ -445,8 +495,9 @@ def stack_ties(known, pairs, new, say=print):
         ctx = st.Context(path, skip_unread=True)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-    st.settle(ctx)
+    st.settle(ctx, partial=True)
     effects = _effects()
+    new_effects(ctx, effects, skip=set(choices), say=say)
     seen = collections.Counter()
     for sid, code in ctx.code.items():
         if sid not in choices:
@@ -461,20 +512,25 @@ def stack_ties(known, pairs, new, say=print):
             ctx.code[sid], ctx.heads[sid] = head.pop("code"), head
             code = list(ctx.code[sid])
             verdict = "wrong"
-            # one unknown: try each effect it could have; several: simulate once, none assumed
+            # one unknown: try each effect it could have; several: guessed from this script alone
+            ops = {op for op, _ in code if op >= NEW_OP and op not in ctx.fixed and op not in ctx.guess}
+            if len(guess) > 1:
+                st.own_effects(ctx, sid, ops)
             for pops, pushes in effects if len(guess) == 1 else [(None, None)]:
                 if pops is not None:
                     ctx.fixed[NEW_OP + next(iter(guess))] = (pops, pushes)
                 try:
-                    st.simulate(ctx, sid)
-                    verdict = "clean"
-                    break
-                except st.Stuck:
-                    verdict = "unsure"
+                    paths = []
+                    st.simulate(ctx, sid, stuck=paths)
+                    verdict = "unsure" if paths else "clean"
+                    if not paths:
+                        break
                 except st.Wrong:
                     pass
             for num in guess:
                 ctx.fixed.pop(NEW_OP + num, None)
+            for op in ops:
+                ctx.guess.pop(op, None)
             if verdict != "wrong":
                 kept.append((verdict, guess, code))
         clean = [(g, c) for v, g, c in kept if v == "clean"]
@@ -482,6 +538,8 @@ def stack_ties(known, pairs, new, say=print):
         how = "its stacks"
         if len(left) > 1:
             left, how = _likeliest(left, seen), "its stacks and the op pairs other scripts use"
+        if len(left) > 1:
+            left, how = _plainest(left, known), "its stacks and the width most ops have"
         if len(left) == 1:
             for num, kind in left[0][0].items():
                 known[num] = (NEW_OP + num, kind)
@@ -506,6 +564,17 @@ def _likeliest(readings, seen, margin=10):
     if scores[1][0] != float("inf") and scores[0][0] >= margin * max(1, scores[1][0]):
         return [readings[scores[0][1]]]
     return readings
+
+
+def _plainest(readings, known):
+    """[the one reading] with the fewest unknowns not at the commonest width, else all of them.
+
+    Readings that all simulate clean and frame the same op pairs differ only in widths. Byte is
+    1223 of 1255 in the 2026-10 map, so the reading that needs the fewest exceptions wins."""
+    common = collections.Counter(kind for _op, kind in known.values()).most_common(1)[0][0]
+    odd = [sum(kind != common for kind in g.values()) for g, _c in readings]
+    best = [r for r, n in zip(readings, odd) if n == min(odd)]
+    return best if len(best) == 1 else readings
 
 
 def kept_numbers(known, current):
@@ -538,8 +607,14 @@ def calibrate_cache(say=print, root=None):
         say("calibration: every op placed agrees with the map in use, so this update kept its "
             "numbers; %d scripts still unread" % report["unread"])
     if report["unread"] and root is None:
-        report["settledByStacks"] = stack_ties(known, pairs, new, say)
-        report["unread"] = sum(1 for raw in new.values() if _opcode_fields(raw, known) is None)
+        report["settledByStacks"] = 0
+        # each pass reads what the last one settled
+        while True:
+            got = stack_ties(known, pairs, new, say)
+            report["settledByStacks"] += got
+            report["unread"] = sum(1 for raw in new.values() if _opcode_fields(raw, known) is None)
+            if not got or not report["unread"]:
+                break
     share = report["unchanged"] / float(len(new) or 1)
     report["saved"] = report["unread"] == 0 and share >= TRUST
     if report["saved"]:
