@@ -38,7 +38,13 @@ def _doc_page(name):
 
 
 def refresh_api_docs():
-    """The api docs mirror and its Lua typings, fetched again where they changed."""
+    """The api docs mirror and its Lua typings, fetched again where they changed. Without
+    beautifulsoup4 it says so and leaves them as they are: the database is installed by then."""
+    import importlib.util
+    if importlib.util.find_spec("bs4") is None:
+        print("the api docs and Lua typings were not refreshed: they need beautifulsoup4 "
+              "(pip install beautifulsoup4)")
+        return 1
     from . import docsfetch
     return docsfetch.main()
 

@@ -83,9 +83,9 @@ The tools that go with it:
     rs3 lab_run <folder>         runs Lua against a copy of a plugin in a sandbox shaped like the client
     rs3 lua_ast "<pattern>"      searches Lua by shape rather than by text
 
-These need some programs: `lua-language-server` for `lsp`, `luac` for `lua_check`, `node` for
-`lua_ast`, and Lua 5.4 for `lab_run` (on PATH, or set `RS3_LUA54`). `rs3 doctor` says which you
-have.
+Fetching the docs needs `pip install beautifulsoup4`. The tools need some programs:
+`lua-language-server` for `lsp`, `luac` for `lua_check`, `node` for `lua_ast`, and Lua 5.4 for
+`lab_run` (on PATH, or set `RS3_LUA54`). `rs3 doctor` says which you have.
 
 ## AI apps
 

@@ -112,6 +112,12 @@ def checks():
         except ImportError:
             add("warn", "Optional: %s" % mod, "not installed",
                 "only for rendering icons and model pictures: pip install pillow numpy")
+    try:
+        __import__("bs4")
+        add("ok", "Optional: beautifulsoup4", "installed")
+    except ImportError:
+        add("warn", "Optional: beautifulsoup4", "not installed",
+            "only for fetching the client api docs and their Lua typings: pip install beautifulsoup4")
 
     port = int(os.environ.get("RS3_MONITOR_PORT") or 7331)
     with socket.socket() as s:

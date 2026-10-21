@@ -13,7 +13,8 @@
   rebuild.
 
 That's all rs3cache needs. If you want to draw item icons or model pictures, also run
-`pip install pillow numpy`.
+`pip install pillow numpy`. For the client API docs and their Lua typings, which a rebuild
+fetches at the end, run `pip install beautifulsoup4`.
 
 ## First setup
 
