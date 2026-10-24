@@ -1458,6 +1458,22 @@ def test_gateway():
     check("gateway: rs3_run answers as the direct call, pick included",
           (ran, "isError" in ran, '"value"' in ran["content"][0]["text"]), (direct, False, True))
 
+    def same_as_direct(name):
+        try:
+            return call(name, {"tool": "rs3_lookup", "pick": "inputSchema.required"}) == direct
+        except Exception:
+            return False
+
+    named = ["rs3cache-rs3_how", "mcp__rs3cache__rs3_how", "rs3cache.rs3_how", "rs3cache:rs3_how"]
+    check("gateway: a tool name still carrying its server's prefix reaches the tool",
+          [n for n in named if not same_as_direct(n)], [])
+    try:
+        call("rs3cache-rs3_nonsense", {})
+        check("gateway: and a name no stripping can place is still refused", "answered", "UnknownTool")
+    except Exception as e:
+        check("gateway: and a name no stripping can place is still refused",
+              type(e).__name__, "UnknownTool")
+
 
 def test_memo():
     """The selftest's memory skips a test while what it ran is unchanged, and only then."""

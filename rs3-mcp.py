@@ -66,6 +66,24 @@ BY_NAME = {t["name"]: t for t in TOOLS}
 GATEWAY = {t["name"]: t for t in gateway.TOOLS}
 gateway.bind(TOOLS, BY_NAME, howto._all_flows())
 
+PREFIX_SEPARATORS = ("__", "-", ".", ":", "/")
+
+
+def unprefixed(name):
+    """The tool's own name, with any server prefix the client kept on it taken off.
+
+    Most send rs3_lookup. Some send rs3cache-rs3_lookup or mcp__rs3cache__rs3_lookup, which this
+    server used to refuse as an unknown tool. Only separators no tool name uses are split on, so
+    rs3_run stays whole.
+    """
+    if name in BY_NAME or name in GATEWAY:
+        return name
+    for sep in PREFIX_SEPARATORS:
+        tail = name.rsplit(sep, 1)[-1]
+        if tail in BY_NAME or tail in GATEWAY:
+            return tail
+    return name
+
 # Toolsets, after github-mcp-server, which groups its tools so a client lists only the ones it
 # needs. The listing is paid once a session whether or not a tool is called, and 49 of them is
 # 8,800 tokens.
@@ -273,7 +291,7 @@ def handle(req):
         return {"contents": [{"uri": uri, "mimeType": mime, "text": body}]}
     if method == "tools/call":
         p = req.get("params") or {}
-        name = p.get("name")
+        name = unprefixed(p.get("name") or "")
         call = p.get("arguments") or {}
         if name == "rs3_run":
             name, call = call.get("tool"), call.get("args") or {}
