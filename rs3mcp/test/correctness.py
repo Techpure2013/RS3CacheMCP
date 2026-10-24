@@ -401,6 +401,56 @@ def _writes_what_it_holds(sprites, cachefile):
         shutil.rmtree(out, ignore_errors=True)
 
 
+def test_quests():
+    """The shipped quest table answers without the add-on, and the bits come from the cache."""
+    from rs3mcp import quests
+
+    rows = quests._rows()
+    check("quests: the shipped table loads", len(rows) > 400, True, "%d rows" % len(rows))
+    check("quests: and most of them carry a var",
+          sum(1 for r in rows if r.get("var")) > 300, True,
+          "%d with a var" % sum(1 for r in rows if r.get("var")))
+
+    got = quests.tool_quest({"name": "Myths of the White Lands"})
+    check("quests: a quest by title gives its var and both thresholds",
+          (got["configID"], got["var"]["name"], got["var"]["startsAt"], got["var"]["completeAt"]),
+          (74, "MOTWL_MAIN", 5, 60))
+    check("quests: and the base var it is packed into",
+          (got["var"]["baseVar"], got["var"]["baseVarId"], got["var"]["mask"], got["var"]["shift"]),
+          ("MOTWL_XMAS08", 2774, 127, 0))
+    check("quests: a config id finds the same quest",
+          quests.tool_quest({"name": "74"})["configName"], got["configName"])
+
+    cooks = quests.tool_quest({"name": "Cook's Assistant"})
+    check("quests: a title two configs share answers with the one that has a var",
+          (cooks["configID"], bool(cooks["var"])), (257, True))
+
+    back = quests.tool_quest_var({"var": "2774"})
+    check("quests: a base var id names the quest riding on it",
+          [q["title"] for q in back["quests"]], ["Myths of the White Lands"])
+    check("quests: and so does the varbit's own name",
+          [q["title"] for q in quests.tool_quest_var({"var": "MOTWL_MAIN"})["quests"]],
+          ["Myths of the White Lands"])
+
+    check("quests: a title nothing matches says so, rather than guessing",
+          quests.tool_quest({"name": "zzzznotaquest"})["found"], 0)
+    vague = quests.tool_quest({"name": "cooks"})
+    check("quests: a fragment matching several offers the candidates, rather than picking one",
+          ("did_you_mean" in vague, vague.get("found", 0) > 1), (True, True))
+
+    # answer with the cache lookup taken away
+    was = quests.connect
+    try:
+        quests.connect = lambda *a, **k: None
+        blind = quests.tool_quest({"name": "Druidic Ritual"})
+    finally:
+        quests.connect = was
+    check("quests: a database whose varbits have no names still answers from the shipped table",
+          (blind["var"]["name"], blind["var"]["startsAt"], blind["var"]["completeAt"],
+           blind["var"]["baseVarId"], blind["var"]["mask"]),
+          ("DRUID_QUEST_2", 2, 8, 2694, 15))
+
+
 def test_maptiles():
     """Map ground: a flags byte per tile, the fields it names in order, the rest kept, and live squares."""
     import struct
@@ -3348,7 +3398,7 @@ TESTS = [test_everything_compiles, test_escape_guard, test_brief_features_logged
          test_toolset_file, test_toolsets, test_spill_and_brief, test_answer_size, test_resources,
          test_continuation, test_protocol, test_claims,
          test_drift_runs, test_scan_cache, test_script_index, test_vars, test_iface,
-         test_cache, test_index, test_invariants, test_opcode_specs, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_calibration, test_script_names, test_cross_tool, test_regressions]
+         test_cache, test_index, test_invariants, test_opcode_specs, test_quests, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_calibration, test_script_names, test_cross_tool, test_regressions]
 
 
 _TIMES = []

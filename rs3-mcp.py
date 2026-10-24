@@ -46,20 +46,26 @@ from rs3mcp import addons, common
 from rs3mcp import gateway
 from rs3mcp import howto
 from rs3mcp import resources
-from rs3mcp import (cache, collision, families, cachediff, drift, research, scriptrefs, dbtable, iface,
-                    script, trace, vars, wiki)
+from rs3mcp import (cache, collision, families, cachediff, drift, quests, research, scriptrefs,
+                    dbtable, iface, script, trace, vars, wiki)
 
 PROTOCOL = "2025-11-25"
 # legacy versions answered, newest first
 SPOKEN = (PROTOCOL, "2025-06-18", "2025-03-26", "2024-11-05")
 
 FAMILIES = [cache, families, trace, cachediff, scriptrefs, script, vars, dbtable, iface, wiki, drift,
-            research, collision]
+            research, collision, quests]
 FAMILIES += addons.families()
 
 TOOLS = []
+_AT = {}
 for _mod in FAMILIES:
-    TOOLS.extend(_mod.TOOLS)
+    for _tool in _mod.TOOLS:
+        if _tool["name"] in _AT:
+            TOOLS[_AT[_tool["name"]]] = _tool
+        else:
+            _AT[_tool["name"]] = len(TOOLS)
+            TOOLS.append(_tool)
 
 BY_NAME = {t["name"]: t for t in TOOLS}
 # find, how and run, listed only when compact
@@ -94,7 +100,7 @@ SETS = {
     "cache": ("cache", "families", "trace", "cachediff"),
     "docs": ("wiki",),
     "scripts": ("script", "scriptrefs"),
-    "game": ("vars", "iface", "dbtable"),
+    "game": ("vars", "iface", "dbtable", "quests"),
     "meta": ("howto", "drift", "research"),
 }
 for _extra in addons.every("toolsets"):

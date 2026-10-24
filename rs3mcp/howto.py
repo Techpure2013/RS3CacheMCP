@@ -25,6 +25,13 @@ FLOWS = [
         ("rs3_var", "the varbit, its base, and its bits"),
         ("rs3_script_refs", "kind=varbit: every script that touches it"),
     ]),
+    ("which var tracks a quest, and at what values", [
+        ("rs3_quest", "by title, config name or config id: the var, and where it starts and completes"),
+        ("rs3_quest_var", "the other way round, from a varbit id, a base var id or a name"),
+        (None, "the cache holds a quest's id and name only, so the rest is a shipped table; "
+               "the mask and shift come from your own cache"),
+        ("rs3_var", "the bits themselves, when you are reading the base var live"),
+    ]),
     ("after the game cache updates", [
         (None, "rs3 rebuild. It refuses to install a worse database"),
         ("rs3_cache_diff", "what the update moved"),
