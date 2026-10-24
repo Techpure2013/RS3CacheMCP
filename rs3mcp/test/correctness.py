@@ -367,6 +367,38 @@ def test_sprites():
                 check("sprites: a live sprite opening on an empty frame still draws",
                       ((frames[0][2], frames[0][3]), sprites._group_png(files[min(files)])[:4]),
                       ((0, 0), b"\x89PNG"))
+        _writes_what_it_holds(sprites, cachefile)
+
+
+def _writes_what_it_holds(sprites, cachefile):
+    """A group the index names but this client never downloaded is not a decode failure.
+
+    The game streams sprites, so a descriptor names groups that have no row here. Counting those
+    as failures stopped a first build installing on someone else's machine.
+    """
+    import shutil
+    import tempfile
+
+    groups = sorted(cachefile.descriptor(sprites.MAJOR, cachefile.GAME) or {})[:40]
+    keep = {g for i, g in enumerate(groups) if i % 2 == 0}
+    out = tempfile.mkdtemp(prefix="sprites-")
+    real = cachefile.stored
+
+    def part(where):
+        folder = os.path.join(out, where)
+        os.makedirs(folder)
+        written, failed, absent = sprites._write_part((folder, cachefile.GAME, groups))
+        return written, len(failed), len(absent), len(os.listdir(folder))
+
+    try:
+        check("sprites: a whole index writes every group it names", part("whole"),
+              (len(groups), 0, 0, len(groups)))
+        cachefile.stored = lambda major, root=None: (real(major, cachefile.GAME) - set(groups)) | keep
+        check("sprites: a group with no row is set aside, not failed", part("partial"),
+              (len(keep), 0, len(groups) - len(keep), len(keep)))
+    finally:
+        cachefile.stored = real
+        shutil.rmtree(out, ignore_errors=True)
 
 
 def test_maptiles():

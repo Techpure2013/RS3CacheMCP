@@ -242,6 +242,31 @@ def group(major, minor, root=GAME):
     return unwrap(row[0]) if row else None
 
 
+_STORED = {}
+
+
+def stored(major, root=GAME):
+    """The group keys this index actually holds.
+
+    An index declares every group the live game has. A streamed index holds only the groups this
+    client has downloaded, so a declared group can be absent with nothing wrong. Kept per index
+    for the life of the process, which is long enough for a rebuild and short enough that a
+    download during one is picked up next run.
+    """
+    key = (root, major)
+    if key in _STORED:
+        return _STORED[key]
+    con = _open(root, major)
+    if con is None:
+        return set()
+    try:
+        got = {r[0] for r in con.execute("select KEY from cache")}
+    except sqlite3.Error:
+        return set()
+    _STORED[key] = got
+    return got
+
+
 def split(raw, nfiles):
     """A group cut into its files.
 

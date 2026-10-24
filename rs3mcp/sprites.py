@@ -148,12 +148,17 @@ def _group_png(data):
 
 
 def _write_part(job):
-    """Some groups into a folder: (written, {group: why it failed})."""
+    """Some groups into a folder: (written, {group: why it failed}, {groups not downloaded})."""
     folder, root, groups = job
     desc = cachefile.descriptor(MAJOR, root) or {}
     desc = {g: desc[g] for g in groups if g in desc}
-    written, failed = 0, {}
+    here = cachefile.stored(MAJOR, root)
+    written, failed, absent = 0, {}, set()
     for g in groups:
+        # set aside the groups this client never downloaded
+        if g not in here:
+            absent.add(g)
+            continue
         try:
             files = cachefile.files(MAJOR, g, root, desc) or {}
             if not files:
@@ -165,11 +170,16 @@ def _write_part(job):
         with open(os.path.join(folder, "sprites-%d.png" % g), "wb") as fh:
             fh.write(body)
         written += 1
-    return written, failed
+    return written, failed, absent
 
 
 def write(folder, root=None, say=print, workers=None):
-    """Every sprite into folder. Returns {group: why} for the ones that did not decode."""
+    """Every sprite this client holds into folder.
+
+    Returns {group: why} for the ones whose bytes are here and did not decode. A group the client
+    has never downloaded is reported but not returned, so a partly streamed cache is not treated
+    as a broken decoder.
+    """
     import multiprocessing
     root = root or cachefile.GAME
     groups = sorted(cachefile.descriptor(MAJOR, root) or {})
@@ -177,12 +187,15 @@ def write(folder, root=None, say=print, workers=None):
     workers = workers or min(32, os.cpu_count() or 1)
     step = max(1, len(groups) // (workers * 4))
     jobs = [(folder, root, groups[i:i + step]) for i in range(0, len(groups), step)]
-    written, failed = 0, {}
+    written, failed, absent = 0, {}, set()
     with multiprocessing.get_context("spawn").Pool(workers) as pool:
-        for n, bad in pool.imap_unordered(_write_part, jobs):
+        for n, bad, gone in pool.imap_unordered(_write_part, jobs):
             written += n
             failed.update(bad)
-    say("sprites            %7d written%s" % (written, ", %d did not decode" % len(failed) if failed else ""))
+            absent |= gone
+    say("sprites            %7d written%s%s"
+        % (written, ", %d did not decode" % len(failed) if failed else "",
+           ", %d not downloaded yet" % len(absent) if absent else ""))
     return failed
 
 
@@ -192,14 +205,21 @@ def main(argv):
         groups = sorted(desc)
         if len(argv) > 1:
             groups = groups[:int(argv[1])]
+        here = cachefile.stored(MAJOR)
+        absent = [g for g in groups if g not in here]
         bad = {}
         for g in groups:
+            if g not in here:
+                continue
             try:
                 files = cachefile.files(MAJOR, g, cachefile.GAME, desc) or {0: b""}
                 decode(files[min(files)])
             except (Stop, struct.error, IndexError, ValueError) as e:
                 bad[g] = str(e)
-        print("%d sprites, %d did not decode" % (len(groups), len(bad)))
+        print("%d sprites, %d did not decode" % (len(groups) - len(absent), len(bad)))
+        if absent:
+            print("  %d of the %d this index names are not downloaded yet"
+                  % (len(absent), len(groups)))
         for g in sorted(bad)[:20]:
             print("  %d: %s" % (g, bad[g]))
         return 1 if bad else 0
