@@ -22,14 +22,23 @@ SPRITES = os.path.join(ROOT, "rs3-cache-stage", "sprites")
 CLIENTSCRIPT = os.path.join(ROOT, "rs3-cache-stage", "clientscript")
 
 
+NAMES = os.path.join(HERE, "names")
+
+
 def name_lists():
-    """The folder of config name lists (`Vars - <type>.csv`), or None. RS3MCP_NAMES, else whatever
-    an add-on offers. Without them configs are built with ids and no names."""
+    """The folder of config name lists (`Vars - <type>.csv`).
+
+    RS3MCP_NAMES first, then whatever an add-on offers, then the set that ships here. The cache
+    carries no name for an interface, a var or a quest, so without a list those come out of a
+    build as bare ids and nothing can look them up.
+    """
     folder = os.environ.get("RS3MCP_NAMES")
     if not folder:
         from . import addons
         folder = addons.first("name_lists")
-    return folder if folder and os.path.isdir(folder) else None
+    if not folder or not os.path.isdir(folder):
+        folder = NAMES
+    return folder if os.path.isdir(folder) else None
 
 MAX_ROWS = 500
 

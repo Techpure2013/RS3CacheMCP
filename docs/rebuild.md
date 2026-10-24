@@ -87,8 +87,12 @@ The cache only stores sprite names as hashes. The rebuild guesses names and chec
 hashes, and keeps any names found in earlier builds. Inventory names are kept from earlier builds
 the same way.
 
-The name lists are a folder of `Vars - <type>.csv` files. You point to them with `RS3MCP_NAMES`
-([settings](settings.md)). Without them everything still builds, but most configs won't have names.
+The name lists are a folder of `Vars - <type>.csv` files. A set ships in `rs3mcp/names` and is used
+without you doing anything; `RS3MCP_NAMES` ([settings](settings.md)) points at a newer one instead.
+
+They matter more than they sound. The cache stores no name at all for an interface, a var or a
+quest, so with no list those build as bare ids and nothing can look one up by name. Items, npcs and
+locs keep the name you see in game but lose their `CONFIG_NAME`.
 
 ### Verify
 

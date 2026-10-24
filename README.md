@@ -130,7 +130,7 @@ running `rs3 setup`, setup copies them into your app's config.
 | `RS3MCP_GAME_CACHE` | where your game cache is, if it's not in `C:\ProgramData\Jagex\RuneScape` |
 | `RS3MCP_DATA` | where to put the database, instead of the `data` folder here |
 | `RS3MCP_ADDONS` | which add-ons to load, separated by commas, or `none` |
-| `RS3MCP_NAMES` | a folder of `Vars - <type>.csv` name lists, to fill in config names |
+| `RS3MCP_NAMES` | a newer folder of `Vars - <type>.csv` name lists than the set in `rs3mcp/names` |
 | `RS3_TOOLSETS` | shows apps only some groups of tools, e.g. `cache,scripts` |
 | `RS3_MONITOR` | `off` turns the scrying pool off |
 | `RS3_MONITOR_PORT` | the scrying pool's port. The default is 7331 |

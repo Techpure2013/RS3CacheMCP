@@ -401,6 +401,39 @@ def _writes_what_it_holds(sprites, cachefile):
         shutil.rmtree(out, ignore_errors=True)
 
 
+def test_name_lists():
+    """A clone with nothing configured still has config names, and a set on disk still wins."""
+    import build_db
+    from rs3mcp import common
+
+    was = os.environ.get("RS3MCP_NAMES")
+    try:
+        os.environ["RS3MCP_NAMES"] = os.path.join(tempfile.gettempdir(), "no-name-lists-here")
+        fallen = common.name_lists()
+        check("names: a path that is not there falls back to the shipped set",
+              fallen and os.path.normcase(fallen) == os.path.normcase(common.NAMES), True)
+        sheets = [f for f in os.listdir(common.NAMES) if f.startswith("Vars - ")]
+        check("names: and the shipped set is really there", len(sheets) > 15, True,
+              "%d sheets" % len(sheets))
+
+        got, varbits, _ = build_db.load_names(common.NAMES)
+        check("names: it names the types the cache cannot",
+              (got.get("Quest", {}).get(74), len(varbits) > 40000),
+              ("MYTHS_OF_THE_WHITE_LANDS", True), "%d varbits" % len(varbits))
+        named = {v[1] for v in varbits}
+        check("names: including the varbits a quest is read from",
+              {"MOTWL_MAIN", "DRUID_QUEST_2"} <= named, True)
+
+        os.environ["RS3MCP_NAMES"] = os.path.dirname(os.path.abspath(build_db.__file__))
+        check("names: a folder that is there is used instead of the shipped one",
+              os.path.normcase(common.name_lists() or "") != os.path.normcase(common.NAMES), True)
+    finally:
+        if was is None:
+            os.environ.pop("RS3MCP_NAMES", None)
+        else:
+            os.environ["RS3MCP_NAMES"] = was
+
+
 def test_quests():
     """The shipped quest table answers without the add-on, and the bits come from the cache."""
     from rs3mcp import quests
@@ -3398,7 +3431,7 @@ TESTS = [test_everything_compiles, test_escape_guard, test_brief_features_logged
          test_toolset_file, test_toolsets, test_spill_and_brief, test_answer_size, test_resources,
          test_continuation, test_protocol, test_claims,
          test_drift_runs, test_scan_cache, test_script_index, test_vars, test_iface,
-         test_cache, test_index, test_invariants, test_opcode_specs, test_quests, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_calibration, test_script_names, test_cross_tool, test_regressions]
+         test_cache, test_index, test_invariants, test_opcode_specs, test_name_lists, test_quests, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_calibration, test_script_names, test_cross_tool, test_regressions]
 
 
 _TIMES = []

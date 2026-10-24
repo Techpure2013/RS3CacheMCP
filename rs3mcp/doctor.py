@@ -85,9 +85,11 @@ def checks():
 
     csvs = common.name_lists()
     has = bool(csvs) and any(f.startswith("Vars - ") for f in os.listdir(csvs))
-    add("ok" if has else "warn", "Config names", csvs if has else "no name lists",
-        None if has else "optional: without them configs have ids but no CONFIG_NAME. Set "
-        "RS3MCP_NAMES to a folder of Vars - <type>.csv files if you have them")
+    shipped = csvs and os.path.normcase(os.path.abspath(csvs)) == os.path.normcase(common.NAMES)
+    add("ok" if has else "warn", "Config names",
+        (csvs + ("  (the shipped set)" if shipped else "")) if has else "no name lists",
+        None if has else "without them interfaces, vars and quests build with no names at all. "
+        "The set that ships is rs3mcp/names; RS3MCP_NAMES points at a newer one")
 
     try:
         probe = os.path.join(common.ROOT, ".doctor-write-test")

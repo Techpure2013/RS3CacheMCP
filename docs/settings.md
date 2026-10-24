@@ -14,7 +14,7 @@ themselves, so set them before you open the app. If you set `RS3MCP_GAME_CACHE`,
 |---|---|---|
 | `RS3MCP_GAME_CACHE` | `C:/ProgramData/Jagex/RuneScape` | where your game cache is |
 | `RS3MCP_DATA` | the `data` folder in rs3cache | where the database and everything else rs3cache builds goes |
-| `RS3MCP_NAMES` | not set | a folder of name lists (`Vars - <type>.csv`). The cache doesn't store most config names, so these fill them in |
+| `RS3MCP_NAMES` | the set in `rs3mcp/names` | a folder of name lists (`Vars - <type>.csv`). The cache stores no name for an interface, a var or a quest, so these fill them in. Set it only to use a newer set than the one that ships |
 
 ## Other settings
 

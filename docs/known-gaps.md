@@ -13,9 +13,13 @@ It gets them all right on fake updates where up to a quarter of scripts changed.
 will be the real test.
 
 **Most sprites don't have names.** The cache only stores a hash of each name, so names have to be
-guessed and checked. With the name lists, the rebuild finds 573 of the 36,425. Without them, it finds
-57. Names found in earlier builds are kept, so there are 669 here. You can find every sprite by id,
-named or not.
+guessed and checked. With the name lists, which now ship, the rebuild finds 573 of the 36,425.
+Without them it finds 57. Names found in earlier builds are kept, so there are 669 here. You can
+find every sprite by id, named or not.
+
+**The name lists go stale on their own.** They ship as `rs3mcp/names` and are not rebuilt from your
+cache, so a config added after the sheets were taken has an id and no name. Where a sheet and the
+cache disagree about a varbit's shape the cache wins; the sheets only lend names.
 
 **Everything reads.** Every config, model, clientscript and sprite can be read, and every clientscript
 comes out as normal code. About 31 ids are still untyped, because their type depends on what
