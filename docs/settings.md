@@ -22,6 +22,7 @@ themselves, so set them before you open the app. If you set `RS3MCP_GAME_CACHE`,
 |---|---|
 | `RS3_TOOLSETS` | shows apps only some groups of tools, e.g. `cache,scripts,game` |
 | `RS3MCP_ADDONS` | which add-ons to load, separated by commas. `none` loads none. See [add-ons](addons.md) |
+| `RS3_UPDATES` | `off` stops it ever looking at github. Otherwise the server asks twice an hour whether the repository has moved on from your copy: one request, a 40 byte reply, and a 304 with no body when nothing has changed. `rs3 doctor` says what it found |
 | `RS3_MONITOR` | `off` turns off the scrying pool |
 | `RS3_MONITOR_PORT` | the scrying pool's port. The default is 7331 |
 | `RS3MCP_USER` | your name on the scrying pool page |

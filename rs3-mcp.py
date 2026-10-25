@@ -431,8 +431,9 @@ def main():
     os.dup2(2, 1)
     sys.stdout = sys.stderr
 
-    from rs3mcp import bypass, journal, poollog
+    from rs3mcp import bypass, journal, poollog, updates
     journal.serve([{"name": t["name"], "set": toolset_of(t)} for t in TOOLS], bypass.advise)
+    updates.start()
     # apps other than Claude Code leave no transcript, so the pool reads what this server saw
     log = poollog.Log()
 

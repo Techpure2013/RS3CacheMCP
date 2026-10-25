@@ -34,7 +34,8 @@ class Log:
 
     def start(self, client):
         """Open a log for the app that just said hello. Nothing for Claude Code, or with the pool off."""
-        name = str((client or {}).get("name") or "unknown app")
+        client = client or {}
+        name = str(client.get("name") or "unknown app")
         if name.startswith("claude-code") or (os.environ.get("RS3_MONITOR") or "").lower() in ("off", "0", "no"):
             return
         folder = os.path.join(POOL, re.sub(r"[^\w.-]+", "-", name).strip("-") or "app")

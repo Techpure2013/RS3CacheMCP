@@ -6,8 +6,9 @@ and clientscript. It builds it all from the cache the game has already downloade
 You can look things up yourself from a terminal. Or you can add it to an AI app like Claude, Cursor,
 VS Code or LM Studio, and the AI can look things up for you.
 
-Everything stays on your computer. The only thing that goes online is `rs3_wiki`, and only when you
-ask it for a wiki page.
+Everything stays on your computer. Two things reach the internet and nothing else: `rs3_wiki`, when
+you ask it for a wiki page, and a check twice an hour asking GitHub whether there is a newer
+version of rs3cache. That check sends nothing about you, and `RS3_UPDATES=off` stops it.
 
 The full docs are in [docs](docs/README.md).
 
@@ -132,6 +133,7 @@ running `rs3 setup`, setup copies them into your app's config.
 | `RS3MCP_ADDONS` | which add-ons to load, separated by commas, or `none` |
 | `RS3MCP_NAMES` | a newer folder of `Vars - <type>.csv` name lists than the set in `rs3mcp/names` |
 | `RS3_TOOLSETS` | shows apps only some groups of tools, e.g. `cache,scripts` |
+| `RS3_UPDATES` | `off` stops the half-hourly check for a newer version on GitHub |
 | `RS3_MONITOR` | `off` turns the scrying pool off |
 | `RS3_MONITOR_PORT` | the scrying pool's port. The default is 7331 |
 | `RS3_PLUGINS` | where your installed plugins are, if not in `~\RS3Plugins` |

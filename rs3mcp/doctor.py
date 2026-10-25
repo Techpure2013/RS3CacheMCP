@@ -91,6 +91,12 @@ def checks():
         None if has else "without them interfaces, vars and quests build with no names at all. "
         "The set that ships is rs3mcp/names; RS3MCP_NAMES points at a newer one")
 
+    from rs3mcp import updates
+    said = updates.status()
+    if said:
+        add("warn" if "git pull" in said else "ok", "Updates", said,
+            "RS3_UPDATES=off stops it looking" if "git pull" in said else None)
+
     try:
         probe = os.path.join(common.ROOT, ".doctor-write-test")
         os.makedirs(common.ROOT, exist_ok=True)

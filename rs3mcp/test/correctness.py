@@ -401,6 +401,48 @@ def _writes_what_it_holds(sprites, cachefile):
         shutil.rmtree(out, ignore_errors=True)
 
 
+def test_update_check():
+    """The half-hourly look at github: what it says, and that it never speaks out of turn."""
+    import subprocess
+    from rs3mcp import common, poollog, updates
+
+    was_read, was_env = updates._read, os.environ.get("RS3_UPDATES")
+    try:
+        head = subprocess.run(["git", "-C", common.BASE, "rev-parse", "HEAD"],
+                              capture_output=True, text=True).stdout.strip()
+        if head:
+            check("updates: it reads this copy's commit without shelling out to git",
+                  updates.local_head(), head)
+
+        now = time.time()
+        for label, state, want in (
+                ("behind", {"local": "a" * 40, "remote": "b" * 40}, "git pull"),
+                ("level", {"local": "c" * 40, "remote": "c" * 40}, "up to date"),
+                ("unreachable", {"local": "c" * 40, "error": "no route"}, "could not reach"),
+                ("no clone", {"local": None, "remote": "d" * 40}, "not a git clone")):
+            updates._read = lambda s=state: dict(s, checked=now)
+            check("updates: %s reads as %r" % (label, want), want in (updates.status() or ""), True)
+
+        os.environ["RS3_UPDATES"] = "off"
+        updates._read = lambda: {}
+        check("updates: switched off it says so, looks at nothing and starts no thread",
+              ("off" in updates.status(), updates.check().get("skipped"), updates.start()),
+              (True, "RS3_UPDATES=off", None))
+    finally:
+        updates._read = was_read
+        if was_env is None:
+            os.environ.pop("RS3_UPDATES", None)
+        else:
+            os.environ["RS3_UPDATES"] = was_env
+
+    try:
+        poollog.Log().start(None)
+        check("updates: an initialize with no clientInfo does not end the session", "fine", "fine")
+    except Exception as e:
+        check("updates: an initialize with no clientInfo does not end the session",
+              type(e).__name__, "fine")
+
+
 def test_name_lists():
     """A clone with nothing configured still has config names, and a set on disk still wins."""
     import build_db
@@ -3431,7 +3473,7 @@ TESTS = [test_everything_compiles, test_escape_guard, test_brief_features_logged
          test_toolset_file, test_toolsets, test_spill_and_brief, test_answer_size, test_resources,
          test_continuation, test_protocol, test_claims,
          test_drift_runs, test_scan_cache, test_script_index, test_vars, test_iface,
-         test_cache, test_index, test_invariants, test_opcode_specs, test_name_lists, test_quests, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_calibration, test_script_names, test_cross_tool, test_regressions]
+         test_cache, test_index, test_invariants, test_opcode_specs, test_update_check, test_name_lists, test_quests, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_calibration, test_script_names, test_cross_tool, test_regressions]
 
 
 _TIMES = []

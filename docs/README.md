@@ -4,8 +4,9 @@ rs3cache reads the RuneScape 3 game cache on your computer and turns it into a d
 questions. You can use it yourself with the `rs3` command, or let an AI app like Claude or Cursor use
 it.
 
-Everything stays on your computer. The only thing that goes online is `rs3_wiki`, and only when you
-ask it for a wiki page.
+Everything stays on your computer. Two things reach the internet: `rs3_wiki`, when you ask it for a
+wiki page, and a check twice an hour asking GitHub whether there is a newer version of rs3cache. The
+check sends nothing about you, and `RS3_UPDATES=off` stops it.
 
 ## Using it
 
