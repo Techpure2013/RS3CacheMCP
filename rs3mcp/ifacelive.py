@@ -11,8 +11,8 @@ than wrong. Everything here reports when a dump was taken and how much it caught
 difference between "this interface has four components" and "four components were up when I
 looked".
 
-Written by quest-dev's `qd ifacedump`, and by the editor's quest-dev, whose ifacefind appends to
-its own repo. RS3_IFACE_LOG names extra logs to read.
+Written by the harvest server out of what quest-dev's `qd ifacedump` posts to it.
+RS3_IFACE_LOG names extra logs to read.
 """
 
 import io
@@ -30,8 +30,8 @@ _CACHE = {}
 def logs():
     """Every log to read: the harvest sink, then anything RS3_IFACE_LOG names.
 
-    The quest-dev in the Quest Helper editor appends to its own repo rather than the sink, so the
-    dumps it takes are only reachable by naming its file. Several paths separate the way PATH does."""
+    A harvest server pointed somewhere else writes its own rec-iface.jsonl, so dumps taken against
+    a second checkout are only reachable by naming its file. Several paths separate as PATH does."""
     found = [LOG]
     for part in (os.environ.get("RS3_IFACE_LOG") or "").split(os.pathsep):
         part = part.strip().strip('"')

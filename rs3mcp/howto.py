@@ -24,8 +24,9 @@ FLOWS = [
     ("an interface that reads as empty", [
         (None, "it builds its children at runtime, so the cache has only the skeleton"),
         ("rs3_iface", "id=: a dump taken off a running client arrives as a live block"),
-        (None, "dump one with quest-dev: `qd ifacedump <id>`, or the Quest Helper editor's "
-               "ifacefind, whose dumps need RS3_IFACE_LOG pointing at its rec-iface.jsonl"),
+        (None, "dump one in game with quest-dev, with the interface open: `qd ifacedump <id>`. It "
+               "posts to the harvest server, which appends rec-iface.jsonl beside the cache. "
+               "RS3_IFACE_LOG names any further log to read, os.pathsep between them"),
         ("rs3_iface", "text=: runtime text is in no cache, so this is the only way to it"),
     ]),
     ("a var behaving oddly", [
