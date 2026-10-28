@@ -285,6 +285,8 @@ def tool_iface(args):
            "note": "parent is the component this one hangs off, null for the root. Add "
                    "component= or ask by \"%d:n\" for one on its own." % iface}
     # a skeleton of the interface, not the screen
+    if str(args.get("dump", "")).lower() in ("1", "true", "yes"):
+        out["dumpRequest"] = ifacelive.request(iface)
     seen = ifacelive.summary(iface, limit)
     if seen is not None:
         out["live"] = seen
@@ -321,5 +323,8 @@ TOOLS = [
          "name": {"type": "string", "description": "interface name, exact or partial"},
          "search": {"type": "string", "description": "list interfaces whose name contains this"},
          "text": {"type": "string", "description": "find components drawing this text"},
+         "dump": {"type": "boolean", "description": "with id=, ask the running client for a fresh "
+                                                    "dump through the relay and wait for it, "
+                                                    "instead of reading whatever was taken before"},
          "limit": {"type": "integer", "description": "max components or hits, default 80"}}}},
 ]

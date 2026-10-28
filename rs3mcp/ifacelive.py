@@ -19,10 +19,12 @@ import io
 import json
 import os
 import time
+import urllib.request
 
 from .common import ROOT
 
 LOG = os.path.join(ROOT, "rec-iface.jsonl")
+RELAY = os.environ.get("QUESTDEV_API") or "http://127.0.0.1:42069"
 
 _CACHE = {}
 
@@ -146,6 +148,42 @@ def find_text(needle, limit=80):
                 if len(hits) >= limit:
                     return hits
     return hits
+
+
+def _taken_at(iface):
+    d = _load().get(iface)
+    if d is None:
+        return 0
+    return d.get("t", 0)
+
+
+def request(iface, wait=8.0):
+    """Ask the running client for a dump of this interface, through the relay.
+
+    The plugin picks the command up on its next tick and posts the tree back, so this waits for a
+    stamp newer than whatever was already there. Nobody has to type anything in game."""
+    before = _taken_at(iface)
+    body = json.dumps({"cmd": "ifacedump", "iface": int(iface)}).encode("utf-8")
+    ask = urllib.request.Request(RELAY + "/api/questdev/goto", data=body,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(ask, timeout=3) as answer:
+            answer.read()
+    except Exception as err:
+        return {"asked": False,
+                "why": "the relay did not answer on %s (%s). Start it, or set QUESTDEV_API."
+                       % (RELAY, err)}
+
+    deadline = time.time() + wait
+    while time.time() < deadline:
+        # force a re-read
+        _CACHE.pop("stamp", None)
+        if _taken_at(iface) > before:
+            return {"asked": True, "arrived": True}
+        time.sleep(0.25)
+    return {"asked": True, "arrived": False,
+            "why": "nothing landed in %gs. The client has to be running with quest-dev connected "
+                   "and the interface open on screen." % wait}
 
 
 def dumped():
