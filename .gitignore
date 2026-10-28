@@ -45,7 +45,6 @@
 /rs3api/sandbox_assets.py
 /rs3api/fonts.py
 /rs3api/configs.py
-/rs3api/ifacelive.py
 /rs3api/varlog.py
 /rs3api/where.py
 /rs3api/opnames.py

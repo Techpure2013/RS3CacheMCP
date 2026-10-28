@@ -3469,10 +3469,115 @@ def test_front_door():
         shutil.rmtree(pool, ignore_errors=True)
 
 
+def test_iface_live():
+    """A dump answers what the cache cannot, and never silently replaces it."""
+    import rs3mcp.iface as I
+    import rs3mcp.ifacelive as V
+
+    real, moved = V.LOG, V.LOG + ".undertest"
+    if os.path.exists(real):
+        os.replace(real, moved)
+    cols = ["static", "category", "dynamic", "type", "x", "y", "w", "h",
+            "visible", "depth", "object", "text"]
+    io.open(real, "w", encoding="utf-8", newline="\n").write(json.dumps({
+        "iface": 284, "columns": cols, "t": time.time(),
+        "rows": [[0, 0, 0, 0, 4, 8, 120, 32, True, 0, -1, ""],
+                 [1, 21, 3, 4, 6, 10, 60, 16, True, 1, -1, "Overload (4:12)"]]}) + "\n")
+    V._CACHE.clear()
+    try:
+        r = I.tool_iface({"id": "284"})
+        check("iface live: a dump lands on the interface it was taken from",
+              (r.get("live") or {}).get("components"), 2)
+        # the cache half survives: a dump adds
+        check("iface live: the cache skeleton is still there", r["components"] > 0, True)
+        check("iface live: the note stops telling you to go and dump it",
+              "qd ifacedump" in r["note"], False)
+
+        # runtime client text is in no cache
+        t = I.tool_iface({"text": "Overload (4:12)"})
+        check("iface live: runtime text is not in the cache", t["found"], 0)
+        check("iface live: and text= finds it in the dump",
+              [h["at"] for h in t.get("fromLiveDumps") or []], ["284:1"])
+
+        check("iface live: an interface never dumped has no live block",
+              "live" in I.tool_iface({"id": "1449"}), False)
+    finally:
+        os.remove(real)
+        if os.path.exists(moved):
+            os.replace(moved, real)
+        V._CACHE.clear()
+
+
+def test_iface_live_second_log():
+    """The editor's quest-dev writes to its own repo, so a named log is read too."""
+    import shutil
+    import tempfile
+    import rs3mcp.ifacelive as V
+
+    real, moved = V.LOG, V.LOG + ".undertest2"
+    if os.path.exists(real):
+        os.replace(real, moved)
+    held = os.environ.get("RS3_IFACE_LOG")
+    tmp = tempfile.mkdtemp(prefix="rs3-iface-")
+    editor = os.path.join(tmp, "rec-iface.jsonl")
+    cols = ["static", "category", "dynamic", "type", "depth",
+            "x", "y", "gx", "gy", "w", "h", "visible",
+            "text", "ops", "sprite", "object", "model", "anim"]
+
+    def line(iid, text, when):
+        return json.dumps({"iface": iid, "columns": cols, "t": when,
+                           "rows": [[12, 0, 3, 0, 1, 112, 31, 812, 431, 36, 36,
+                                     True, text, "Select", -1, -1, -1, -1]]}) + "\n"
+
+    try:
+        check("iface live: no logs at all reads as nothing", V.logs(), [])
+
+        io.open(editor, "w", encoding="utf-8", newline="\n").write(line(1477, "Accept", 2000))
+        os.environ["RS3_IFACE_LOG"] = editor
+        V._CACHE.clear()
+        check("iface live: a named log is picked up", V.have(1477), True)
+        s = V.summary(1477)
+        check("iface live: and read in the editor's 18 column shape",
+              [c.get("text") for c in s["children"]], ["Accept"])
+        check("iface live: x stays parent relative", s["children"][0]["x"], 112)
+        check("iface live: gx is the screen position", s["children"][0]["gx"], 812)
+        check("iface live: a dump off the sink names its file", s.get("source"), editor)
+        check("iface live: text search reaches the named log",
+              [h["at"] for h in V.find_text("accept")], ["1477:12"])
+
+        # latest wins across files
+        io.open(real, "w", encoding="utf-8", newline="\n").write(line(1477, "Newer", 3000))
+        V._CACHE.clear()
+        check("iface live: both logs are read", len(V.logs()), 2)
+        check("iface live: the later dump wins across files",
+              [c.get("text") for c in V.summary(1477)["children"]], ["Newer"])
+        check("iface live: and the sink is not called a source",
+              "source" in V.summary(1477), False)
+
+        io.open(real, "w", encoding="utf-8", newline="\n").write(line(1477, "Older", 1000))
+        V._CACHE.clear()
+        check("iface live: an older sink dump does not beat the editor's",
+              [c.get("text") for c in V.summary(1477)["children"]], ["Accept"])
+
+        os.environ["RS3_IFACE_LOG"] = os.pathsep.join([editor, os.path.join(tmp, "absent.jsonl")])
+        V._CACHE.clear()
+        check("iface live: a path that is not there is skipped", len(V.logs()), 2)
+    finally:
+        if held is None:
+            os.environ.pop("RS3_IFACE_LOG", None)
+        else:
+            os.environ["RS3_IFACE_LOG"] = held
+        if os.path.exists(real):
+            os.remove(real)
+        if os.path.exists(moved):
+            os.replace(moved, real)
+        shutil.rmtree(tmp, ignore_errors=True)
+        V._CACHE.clear()
+
 TESTS = [test_everything_compiles, test_escape_guard, test_brief_features_logged, test_scrying_pool, test_handback, test_learned_lines, test_handback_replay, test_agent_budget, test_bypass_advice, test_front_door,
          test_toolset_file, test_toolsets, test_spill_and_brief, test_answer_size, test_resources,
          test_continuation, test_protocol, test_claims,
-         test_drift_runs, test_scan_cache, test_script_index, test_vars, test_iface,
+         test_drift_runs, test_scan_cache, test_script_index, test_vars, test_iface, test_iface_live, test_iface_live_second_log,
          test_cache, test_index, test_invariants, test_opcode_specs, test_update_check, test_name_lists, test_quests, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_calibration, test_script_names, test_cross_tool, test_regressions]
 
 

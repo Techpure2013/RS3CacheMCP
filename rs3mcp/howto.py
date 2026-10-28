@@ -21,6 +21,13 @@ FLOWS = [
         ("rs3_dbtable", "text= searches the data tables nothing else reaches"),
         ("rs3_script", "clientscripts, when the cache will not say"),
     ]),
+    ("an interface that reads as empty", [
+        (None, "it builds its children at runtime, so the cache has only the skeleton"),
+        ("rs3_iface", "id=: a dump taken off a running client arrives as a live block"),
+        (None, "dump one with quest-dev: `qd ifacedump <id>`, or the Quest Helper editor's "
+               "ifacefind, whose dumps need RS3_IFACE_LOG pointing at its rec-iface.jsonl"),
+        ("rs3_iface", "text=: runtime text is in no cache, so this is the only way to it"),
+    ]),
     ("a var behaving oddly", [
         ("rs3_var", "the varbit, its base, and its bits"),
         ("rs3_script_refs", "kind=varbit: every script that touches it"),

@@ -14,18 +14,7 @@ Tools:
 import json
 import os
 
-from . import addons
-
-
-class _NoDumps:
-    """What an interface dump reader answers when no add-on offers one."""
-    find_text = staticmethod(lambda needle, limit: [])
-    dumped = staticmethod(lambda: [])
-    summary = staticmethod(lambda iface, limit: None)
-
-
-def _dumps():
-    return addons.first("interface_dumps") or _NoDumps
+from . import ifacelive
 from .common import connect
 
 SHIFT = 16
@@ -208,7 +197,7 @@ def tool_iface(args):
                              "name": name, "text": drawn})
                 if len(hits) >= limit:
                     break
-        live = _dumps().find_text(needle, limit)
+        live = ifacelive.find_text(needle, limit)
         out = {"found": len(hits), "components": hits,
                "note": "components whose drawn text contains that. The string is the one baked "
                        "into the interface, so anything the game fills in at runtime is not here."}
@@ -241,7 +230,7 @@ def tool_iface(args):
                "note": "ids are packed interface<<16|component. Pass id=284, id=\"284:5\" or a "
                        "raw packed id, or search= by name, or text= by what is drawn on screen."}
         # which ones have been dumped, so gaps show
-        seen = _dumps().dumped()
+        seen = ifacelive.dumped()
         if seen:
             out["liveDumps"] = seen
             out["note"] += (" liveDumps are the interfaces there are dumps of, the only way to see "
@@ -296,7 +285,7 @@ def tool_iface(args):
            "note": "parent is the component this one hangs off, null for the root. Add "
                    "component= or ask by \"%d:n\" for one on its own." % iface}
     # a skeleton of the interface, not the screen
-    seen = _dumps().summary(iface, limit)
+    seen = ifacelive.summary(iface, limit)
     if seen is not None:
         out["live"] = seen
 
