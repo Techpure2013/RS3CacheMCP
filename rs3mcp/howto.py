@@ -23,12 +23,12 @@ FLOWS = [
     ]),
     ("an interface that reads as empty", [
         (None, "it builds its children at runtime, so the cache has only the skeleton"),
-        ("rs3_iface", "id= with dump=true asks the running client through the relay and waits, so "
-                      "nothing has to be typed in game. The interface has to be open on screen"),
+        ("rs3_iface", "id= with dump=true asks the running client through the editor's relay and "
+                      "waits, so nothing has to be typed in game. The interface has to be open on screen"),
         ("rs3_iface", "id= alone reads the last dump taken, as a live block"),
-        (None, "`qd ifacedump <id>` does the same by hand. Either way a catcher writes "
-               "rec-iface.jsonl: the relay on 42069, or quest-harvest-server.py on 8777"),
-        (None, "RS3_IFACE_LOG names any further log to read, os.pathsep between them"),
+        (None, "the editor's ifacefind in dump mode does the same by hand. Its relay writes "
+               "rec-iface.jsonl in the editor folder, so RS3_IFACE_LOG has to point at that file"),
+        (None, "RS3_IFACE_LOG takes several paths, os.pathsep between them"),
         ("rs3_iface", "text=: runtime text is in no cache, so this is the only way to it"),
     ]),
     ("a var behaving oddly", [

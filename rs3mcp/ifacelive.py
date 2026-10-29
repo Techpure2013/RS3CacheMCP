@@ -11,8 +11,8 @@ than wrong. Everything here reports when a dump was taken and how much it caught
 difference between "this interface has four components" and "four components were up when I
 looked".
 
-Written by the harvest server out of what quest-dev's `qd ifacedump` posts to it.
-RS3_IFACE_LOG names extra logs to read.
+Written by the Quest Helper editor's relay, from what its ifacefind posts in dump mode, into
+rec-iface.jsonl in the editor folder. RS3_IFACE_LOG names that file.
 """
 
 import io
@@ -32,8 +32,8 @@ _CACHE = {}
 def logs():
     """Every log to read: the harvest sink, then anything RS3_IFACE_LOG names.
 
-    A harvest server pointed somewhere else writes its own rec-iface.jsonl, so dumps taken against
-    a second checkout are only reachable by naming its file. Several paths separate as PATH does."""
+    The editor's relay writes rec-iface.jsonl in the editor folder rather than the sink, so its
+    dumps are only reachable by naming that file. Several paths separate as PATH does."""
     found = [LOG]
     for part in (os.environ.get("RS3_IFACE_LOG") or "").split(os.pathsep):
         part = part.strip().strip('"')
@@ -163,7 +163,8 @@ def request(iface, wait=8.0):
     The plugin picks the command up on its next tick and posts the tree back, so this waits for a
     stamp newer than whatever was already there. Nobody has to type anything in game."""
     before = _taken_at(iface)
-    body = json.dumps({"cmd": "ifacedump", "iface": int(iface)}).encode("utf-8")
+    # ifacefind in dump mode, id in quest
+    body = json.dumps({"cmd": "ifacefind", "mode": "dump", "quest": str(int(iface))}).encode("utf-8")
     ask = urllib.request.Request(RELAY + "/api/questdev/goto", data=body,
                                  headers={"Content-Type": "application/json"})
     try:
