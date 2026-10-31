@@ -6,7 +6,7 @@ it, what reads it, and what the value means. Same for interface behaviour and qu
 
 Indexed by token, which reversed an earlier decision. The argument against was that the
 corpus scans in about a second, and that holds for a warm cache and a pattern that matches
-early. A pattern matching nothing reads all 21,102 files, and under a cold cache one took
+early. A pattern matching nothing reads all 21,264 files, and under a cold cache one took
 123 seconds during a soak.
 
 The index holds every identifier token. A pattern made only of identifier characters must
@@ -84,7 +84,7 @@ def _runs(pattern):
 def _candidates(pattern, regex):
     """Which files can possibly match, or None meaning look at all of them.
 
-    Substring of a token, not a whole one: SETHIDE has to find IF_SETHIDE. Scanning 126,287
+    Substring of a token, not a whole one: SETHIDE has to find IF_SETHIDE. Scanning 127,158
     short tokens is 30ms against reading 22MB. A pattern with punctuation narrows by its longest
     identifier, so the result stays a superset and is searched properly after.
     """
@@ -239,7 +239,7 @@ def tool_script_read(args):
 
 TOOLS = [
     {"name": "rs3_script", "fn": tool_script,
-     "description": "Search the 21,101 decompiled clientscripts for a pattern, with surrounding "
+     "description": "Search the 21,263 decompiled clientscripts for a pattern, with surrounding "
                     "lines. These settle what the cache cannot: what writes a varbit, what reads "
                     "it, what a value means. About a second. rs3_script_read takes the id this "
                     "returns; rs3_script_refs goes the other way, from a varbit or item id.",

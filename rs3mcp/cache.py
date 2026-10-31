@@ -49,7 +49,7 @@ Things that are easy to get wrong here:
   in the cache links an npc to its shop, or gives a shop a location - that is server side.
 - Sprites carry a name hash, not a name. sprite_name holds the cracked ones, sprite_use holds
   everything that points at a sprite (interface components and params typed SPRITE), sprite_hash
-  holds all 36569 hashes.
+  holds all 36575 hashes.
 """
 
 

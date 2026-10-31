@@ -1,7 +1,7 @@
 """The game's data tables, and the rows in them.
 
-391 tables holding 20,366 rows: currencies, cosmetics, farm paddocks, invention materials.
-Content that is not an item, npc or loc. Before the opcodes were worked out 13,977 were filed under
+391 tables holding 20,426 rows: currencies, cosmetics, farm paddocks, invention materials.
+Content that is not an item, npc or loc. Before the opcodes were worked out 14,034 were filed under
 the wrong table: the table id is a leb128, see rs3mcp/specs/dbrows.ops.
 
 Two things to know.
@@ -13,7 +13,7 @@ Column types stay numbers. Three are settled: 1 boolean, 9 packed interface comp
 The rest are not guessed at. Id spaces here overlap enough that a small column matches items, npcs
 and structs alike.
 
-The 26,957 strings in these rows are reachable from nothing else. text= searches them.
+The 27,051 strings in these rows are reachable from nothing else. text= searches them.
 
   rs3_dbtable   a table's columns and rows, a text search, or a packed dbcolumn split up
 """
