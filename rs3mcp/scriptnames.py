@@ -49,12 +49,14 @@ class Scripts:
     """What the decompiled scripts and the database say about who runs whom."""
 
     def __init__(self, folder, db_path=None):
-        self.texts = {}
-        for f in os.listdir(folder):
-            m = FILE.match(f)
-            if m:
-                with io.open(os.path.join(folder, f), encoding="utf-8") as fh:
-                    self.texts[int(m.group(1))] = fh.read()
+        import concurrent.futures
+
+        def read(f):
+            with io.open(os.path.join(folder, f), encoding="utf-8") as fh:
+                return int(FILE.match(f).group(1)), fh.read()
+        # opens are slow here, so in parallel
+        with concurrent.futures.ThreadPoolExecutor(16) as pool:
+            self.texts = dict(pool.map(read, [f for f in os.listdir(folder) if FILE.match(f)]))
         self.calls = collections.defaultdict(set)
         self.called, self.hooked = set(), set()
         for sid, text in self.texts.items():
@@ -104,6 +106,15 @@ class Scripts:
         out.update(self.iface_name[i] for i in self.ifaces.get(sid, ()) if i in self.iface_name)
         return out
 
+    def touched(self, named):
+        """The scripts whose stems a name for any of these can change: the ones near it and the
+        ones calling or called by it, which is what stems() reads."""
+        out = set()
+        for c in named:
+            out.update(range(c - NEAR, c + NEAR + 1))
+            out.update(self.calls.get(c, ()))
+        return out
+
 
 def _suffixes(words):
     """{(length, hash): [suffix]} for `_word]`, and `]` alone."""
@@ -113,16 +124,20 @@ def _suffixes(words):
     return table
 
 
-def crack(targets, names, scripts, table):
-    """{script: name} where one candidate matches its hash."""
+def crack(targets, names, scripts, table, heads=None):
+    """{script: name} where one candidate matches its hash. heads keeps each head's hash between
+    calls."""
     lengths = sorted({k[0] for k in table})
+    heads = {} if heads is None else heads
     found = {}
     for sid, h in targets.items():
         hits = set()
         for stem in scripts.stems(sid, names):
             for kind in ("clientscript", "proc"):
                 head = "[%s,%s" % (kind, stem)
-                hh = jhash(head)
+                hh = heads.get(head)
+                if hh is None:
+                    hh = heads[head] = jhash(head)
                 for n in lengths:
                     for s in table.get((n, (h - hh * POW[n]) & M), ()):
                         hits.add(head + s)
@@ -154,14 +169,17 @@ def name_all(folder, root=None, db_path=None, say=print):
     for sid, n in listed_names(target).items():
         if scripts.kind_fits(sid, n) is not False:
             names[sid], how[sid] = n, "listed"
+    heads, moved = {}, None
     while True:
-        todo = {sid: h for sid, h in target.items() if sid not in names}
-        got = {sid: n for sid, n in crack(todo, names, scripts, table).items()
+        # later rounds: only beside new names
+        todo = {sid: h for sid, h in target.items() if sid not in names and (moved is None or sid in moved)}
+        got = {sid: n for sid, n in crack(todo, names, scripts, table, heads).items()
                if scripts.kind_fits(sid, n) is True}
         if not got:
             break
         names.update(got)
         how.update({sid: "cracked" for sid in got})
+        moved = scripts.touched(got)
     for sid, n in kept.items():
         if how.get(sid) == "listed":
             continue
@@ -171,7 +189,7 @@ def name_all(folder, root=None, db_path=None, say=print):
         how[sid] = "checked" if supported else "unchecked"
     # context cracks replace unchecked names
     doubtful = {sid: target[sid] for sid, v in how.items() if v == "unchecked"}
-    for sid, n in crack(doubtful, names, scripts, table).items():
+    for sid, n in crack(doubtful, names, scripts, table, heads).items():
         if n != names[sid] and scripts.kind_fits(sid, n) is True:
             names[sid], how[sid] = n, "cracked"
     say("clientscript names: %d listed, %d checked, %d cracked, %d unchecked, of %d scripts"

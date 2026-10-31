@@ -61,6 +61,7 @@ records carrying it.
 
 import collections
 import io
+import json
 import os
 import re
 import struct
@@ -241,12 +242,30 @@ def parse(text, source="spec"):
 
 
 _LOADED = {}
+# opcodes a rebuild learned
+LEARNED = os.path.join(os.environ.get("RS3MCP_DATA") or os.path.join(os.path.dirname(HERE), "data"),
+                       "learned-ops.json")
+
+
+def learned():
+    """{type: {opcode: {"shape", "alternatives", "records", "learned"}}} from LEARNED."""
+    try:
+        got = json.load(io.open(LEARNED, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {t: {int(op, 0): v for op, v in ops.items()} for t, ops in got.items()}
 
 
 def load(name):
+    """A spec, with any opcode a rebuild learned for it that the spec does not have yet, named
+    unkXX. The spec wins as soon as it has the opcode."""
     if name not in _LOADED:
         path = os.path.join(SPECS, name + ".ops")
-        _LOADED[name] = parse(io.open(path, encoding="utf-8").read(), os.path.basename(path))
+        spec = parse(io.open(path, encoding="utf-8").read(), os.path.basename(path))
+        for op, v in learned().get(name, {}).items():
+            if op not in spec["ops"]:
+                spec["ops"][op] = ("unk%02X" % op, parse_shape(v["shape"]), "learned %s" % v.get("learned", ""))
+        _LOADED[name] = spec
     return _LOADED[name]
 
 
@@ -449,6 +468,8 @@ def decode(spec, data, overrides=None):
 
     Otherwise it says where it stopped and why, and the fields read before that are kept.
     """
+    if data is None:
+        return {}, {"kind": "unread", "at": 0, "why": "its group would not unpack or split"}
     ops = spec["ops"]
     buf, out = Buf(data), {}
     if spec.get("record"):
@@ -481,7 +502,10 @@ def decode(spec, data, overrides=None):
 
 def records(spec, root=None, minors=None):
     """(config id, bytes) for every record of this type in the game cache, or only those in the
-    given groups."""
+    given groups.
+
+    A group the client holds whose bytes will not unpack or split gives each of its records as
+    (id, None), so the caller names them as failures. Skipping it lost them without a word."""
     from . import cachefile
     root = root or cachefile.GAME
     desc = cachefile.descriptor(spec["index"], root)
@@ -492,14 +516,21 @@ def records(spec, root=None, minors=None):
     size = cachefile.chunk(desc) if layout == "chunked" else None
     if minors is not None:
         desc = {m: desc[m] for m in minors if m in desc}
+    held = cachefile.stored(spec["index"], root)
+
+    def read(minor):
+        got = cachefile.files(spec["index"], minor, root, desc)
+        if got is None and minor in held and minor in desc:
+            return {fid: None for fid in desc[minor]["files"]}
+        return got or {}
     if spec["group"] is not None:
         # one group holds the whole type
-        files = cachefile.files(spec["index"], spec["group"], root, desc) or {}
+        files = read(spec["group"])
         for fid in sorted(files):
             yield fid, files[fid]
         return
     for minor in sorted(desc):
-        files = cachefile.files(spec["index"], minor, root, desc) or {}
+        files = read(minor)
         for fid in sorted(files):
             if layout == "groups":
                 # a group is one record, keyed by group
@@ -586,6 +617,85 @@ def solve(name, opcode, root=None, limit=8, sample=400, spec=None):
     ranked.sort(key=lambda r: (-r["fits"], len(r["shape"])))
     return {"type": name, "opcode": "0x%02X" % opcode, "records": len(carrying),
             "shapes": ranked[:limit]}
+
+
+def settle(name, opcode, root=None, sample=400, spec=None):
+    """A shape for an opcode the spec lacks, when the records that stop at it settle one, or None.
+
+    Every shape that decodes all of them to their end has to leave the rest of each record the
+    same. Then the shapes differ only in how this one value reads, u16 against i16 against
+    bytes[2], and the first is taken. Shapes that fit but move what follows, or a record that
+    still will not decode, leave it unsettled. Returns {shape, alternatives, records}."""
+    spec = spec or load(name)
+    carrying = []
+    for _cid, data in records(spec, root):
+        _fields, problem = decode(spec, data)
+        if problem and problem.get("kind") == "unknown" and problem.get("opcode") == opcode:
+            carrying.append(data)
+            if len(carrying) >= sample:
+                break
+    if not carrying:
+        return None
+    fit = []
+    for text in CANDIDATES:
+        trial = {opcode: ("candidate", parse_shape(text), "")}
+        rest = []
+        for data in carrying:
+            fields, problem = decode(spec, data, trial)
+            if problem is not None:
+                break
+            fields.pop("candidate", None)
+            rest.append(json.dumps(fields, sort_keys=True, default=str))
+        else:
+            fit.append((text, rest))
+    if not fit or any(r != fit[0][1] for _t, r in fit[1:]):
+        return None
+    # variable width first
+    fit.sort(key=lambda f: "var" not in f[0])
+    return {"shape": fit[0][0], "alternatives": [t for t, _ in fit[1:]], "records": len(carrying)}
+
+
+def stuck(spec, ids, root=None):
+    """{opcode: records} for the unknown opcodes these records stop at."""
+    want = set(ids)
+    got = collections.Counter()
+    for cid, data in records(spec, root):
+        if cid in want:
+            _fields, problem = decode(spec, data)
+            if problem and problem.get("kind") == "unknown":
+                got[problem["opcode"]] += 1
+    return dict(got)
+
+
+def learn(failures, root=None, say=print, when=None):
+    """Settle what can be of the unknown opcodes these failures stop at, into LEARNED.
+
+    {type: [opcodes learned]}. A spec that later names an opcode wins over what was learned."""
+    import time
+    have = {t: {"0x%02X" % op: v for op, v in ops.items()} for t, ops in learned().items()}
+    got = {}
+    for name, ids in sorted(failures.items()):
+        if not ids or not os.path.exists(os.path.join(SPECS, name + ".ops")):
+            continue
+        spec = load(name)
+        for op, n in sorted(stuck(spec, ids, root).items()):
+            found = settle(name, op, root, spec=spec)
+            if found is None:
+                say("learned: %s 0x%02X stops %d record(s) and no one shape settles it" % (name, op, n))
+                continue
+            found["learned"] = when or time.strftime("%Y-%m-%d")
+            have.setdefault(name, {})["0x%02X" % op] = found
+            got.setdefault(name, []).append(op)
+            say("learned: %s 0x%02X as %s, from %d record(s)%s" % (
+                name, op, found["shape"], found["records"],
+                "; it could also read as " + ", ".join(found["alternatives"][:4]) if found["alternatives"] else ""))
+    if got:
+        os.makedirs(os.path.dirname(LEARNED), exist_ok=True)
+        with io.open(LEARNED, "w", encoding="utf-8") as fh:
+            json.dump(have, fh, indent=1, sort_keys=True)
+        for name in got:
+            _LOADED.pop(name, None)
+    return got
 
 
 def main(argv):

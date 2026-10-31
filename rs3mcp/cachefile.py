@@ -8,6 +8,11 @@ Traps:
   a group's file boundaries are a header of offsets, not the older trailer of deltas
   chunk size differs per index. Derived, not written down anywhere
 
+  the CRC column is the index's crc plus one, as a signed int, not the crc itself
+
+Groups fetched from OpenRS2 (rs3mcp/openrs2.py) sit in an overlay of the same shape, never in the
+client's own files. Reading the live cache takes whichever copy of a group matches the newer index.
+
 Hands back bytes. Decodes nothing.
 """
 
@@ -22,6 +27,16 @@ import zlib
 
 # where the launcher keeps the cache
 GAME = os.environ.get("RS3MCP_GAME_CACHE") or "C:/ProgramData/Jagex/RuneScape"
+# groups newer than the client's, fetched from OpenRS2
+OVERLAY = os.environ.get("RS3MCP_OVERLAY") or os.path.join(
+    os.environ.get("RS3MCP_DATA") or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data"),
+    "openrs2")
+
+
+def stored_crc(crc):
+    """What the CRC column holds for a group whose index crc is crc."""
+    v = (crc + 1) & 0xFFFFFFFF
+    return v - (1 << 32) if v >= 1 << 31 else v
 
 
 def builds():
@@ -138,12 +153,42 @@ def _open(root, major):
 _DESCRIPTORS = {}
 
 
+def _overlay(major, root):
+    """The overlay for this index, when root is the live cache and the overlay has one."""
+    if os.path.normcase(os.path.abspath(root)) != os.path.normcase(os.path.abspath(GAME)):
+        return None
+    return _open(OVERLAY, major)
+
+
+def _mtime(root, major):
+    try:
+        return os.path.getmtime(os.path.join(root, "js5-%d.jcache" % major))
+    except OSError:
+        return 0
+
+
+def _index_root(major, root):
+    """Where the newer index for this major is: the overlay when it was written after the client
+    last wrote, else root. The client fetches every index it uses on login, so a client file
+    written later holds an index at least as new."""
+    over = _overlay(major, root)
+    if over is None or _mtime(OVERLAY, major) <= _mtime(root, major):
+        return root
+    try:
+        # an unfinished fetch has no index
+        held = over.execute("select 1 from cache_index where KEY = 1").fetchone()
+    except sqlite3.Error:
+        held = None
+    return OVERLAY if held else root
+
+
 def descriptor(major, root=GAME):
     """What groups this index holds, and the files in each.
 
     File ids are sparse, so position in the group is not the id. Kept per index until its stored
     bytes change, since the models index takes most of a second to read. Treat it as read only.
     """
+    root = _index_root(major, root)
     con = _open(root, major)
     if con is None:
         return None
@@ -230,16 +275,50 @@ def absolute(desc):
             for minor, v in desc.items() for fid in v["files"]}
 
 
+_WANT = {}
+
+
+def _want(major, root):
+    """{group: the CRC column its current copy has}, from the newer index, kept until either
+    file is written again."""
+    stamp = (_mtime(root, major), _mtime(OVERLAY, major))
+    kept = _WANT.get((root, major))
+    if kept and kept[0] == stamp:
+        return kept[1]
+    got = {g: stored_crc(v["crc"]) for g, v in (descriptor(major, root) or {}).items()}
+    _WANT[(root, major)] = (stamp, got)
+    return got
+
+
 def group(major, minor, root=GAME):
-    """One group's bytes, decompressed, or None."""
+    """One group's bytes, decompressed, or None.
+
+    With an overlay, the copy whose crc the newer index names, else the client's."""
+    return _pick(major, minor, root)[0]
+
+
+def _pick(major, minor, root):
+    """(bytes, whether they came from the overlay), which lays its files out differently."""
     con = _open(root, major)
-    if con is None:
-        return None
-    try:
-        row = con.execute("select DATA from cache where KEY = ?", (minor,)).fetchone()
-    except sqlite3.Error:
-        return None
-    return unwrap(row[0]) if row else None
+    over = _overlay(major, root)
+    rows = []
+    for c in (con, over):
+        if c is None:
+            continue
+        try:
+            row = c.execute("select DATA, CRC from cache where KEY = ?", (minor,)).fetchone()
+        except sqlite3.Error:
+            continue
+        if row:
+            rows.append(row + (c is over,))
+    if not rows:
+        return None, False
+    if over is not None:
+        want = _want(major, root).get(minor)
+        for data, crc, fetched in rows:
+            if crc == want:
+                return unwrap(data), fetched
+    return unwrap(rows[0][0]), rows[0][2]
 
 
 _STORED = {}
@@ -256,13 +335,14 @@ def stored(major, root=GAME):
     key = (root, major)
     if key in _STORED:
         return _STORED[key]
-    con = _open(root, major)
-    if con is None:
-        return set()
-    try:
-        got = {r[0] for r in con.execute("select KEY from cache")}
-    except sqlite3.Error:
-        return set()
+    got = set()
+    for con in (_open(root, major), _overlay(major, root)):
+        if con is None:
+            continue
+        try:
+            got |= {r[0] for r in con.execute("select KEY from cache")}
+        except sqlite3.Error:
+            pass
     _STORED[key] = got
     return got
 
@@ -292,16 +372,40 @@ def split(raw, nfiles):
     return out
 
 
+def split_js5(raw, nfiles):
+    """A group as js5 serves it, OpenRS2 included, cut into its files: the files back to back,
+    then per chunk a size delta per file, then the chunk count."""
+    if nfiles <= 1:
+        return [raw]
+    if not raw:
+        return None
+    chunks = raw[-1]
+    at = len(raw) - 1 - chunks * nfiles * 4
+    if chunks == 0 or at < 0:
+        return None
+    out, pos = [b""] * nfiles, 0
+    for _ in range(chunks):
+        size = 0
+        for f in range(nfiles):
+            size += struct.unpack_from(">i", raw, at)[0]
+            at += 4
+            if size < 0 or pos + size > len(raw):
+                return None
+            out[f] += raw[pos:pos + size]
+            pos += size
+    return out
+
+
 def files(major, minor, root=GAME, desc=None):
     """{fileid: bytes} for one group, which is the shape everything downstream wants."""
     d = desc if desc is not None else descriptor(major, root)
     if not d or minor not in d:
         return None
     ids = d[minor]["files"]
-    raw = group(major, minor, root)
+    raw, fetched = _pick(major, minor, root)
     if raw is None:
         return None
-    parts = split(raw, len(ids))
+    parts = (split_js5 if fetched else split)(raw, len(ids))
     if parts is None or len(parts) != len(ids):
         return None
     return dict(zip(ids, parts))

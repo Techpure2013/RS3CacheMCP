@@ -2047,6 +2047,251 @@ def test_stack_ties_ops_of_one_script():
           {n: (known.get(n) or (None, None))[1] for n in own[sid]}, {n: full[n][1] for n in own[sid]})
 
 
+def test_overlay_reads_the_newer_copy():
+    """OpenRS2's groups sit in an overlay over the client's cache. A group comes from whichever side
+    the newer index names, a fetch cut short before its index changes nothing, and a client that
+    wrote after the overlay is in charge again."""
+    import shutil
+    import sqlite3
+    import struct
+    from rs3mcp import cachefile as cf
+
+    def box(raw):
+        return bytes([0]) + struct.pack(">I", len(raw)) + raw
+
+    def index(crcs):
+        raw = bytes([7]) + struct.pack(">IBH", 1, 0, len(crcs))
+        prev = 0
+        for g in sorted(crcs):
+            raw += struct.pack(">H", g - prev)
+            prev = g
+        raw += b"".join(struct.pack(">I", crcs[g]) for g in sorted(crcs))
+        raw += b"".join(struct.pack(">I", 1) for _ in crcs)
+        raw += b"".join(struct.pack(">H", 1) for _ in crcs)
+        raw += b"".join(struct.pack(">H", 0) for _ in crcs)
+        return box(raw)
+
+    def jcache(folder, crcs, rows, when):
+        os.makedirs(folder, exist_ok=True)
+        path = os.path.join(folder, "js5-99.jcache")
+        con = sqlite3.connect(path)
+        con.executescript("CREATE TABLE IF NOT EXISTS cache (KEY INTEGER PRIMARY KEY, DATA BLOB, VERSION INTEGER, CRC INTEGER);"
+                          "CREATE TABLE IF NOT EXISTS cache_index (KEY INTEGER PRIMARY KEY, DATA BLOB, VERSION INTEGER, CRC INTEGER);")
+        if crcs is not None:
+            con.execute("insert or replace into cache_index values (1, ?, 0, 0)", (index(crcs),))
+        for g, (data, crc) in rows.items():
+            con.execute("insert or replace into cache values (?, ?, 1, ?)", (g, box(data), cf.stored_crc(crc)))
+        con.commit()
+        con.close()
+        os.utime(path, (when, when))
+
+    def fresh():
+        for con in cf._OPEN.values():
+            con.close()
+        for kept in (cf._OPEN, cf._DESCRIPTORS, cf._WANT, cf._STORED):
+            kept.clear()
+
+    tmp = tempfile.mkdtemp()
+    game, over = os.path.join(tmp, "game"), os.path.join(tmp, "openrs2")
+    saved = cf.GAME, cf.OVERLAY
+    fresh()
+    cf.GAME, cf.OVERLAY = game, over
+    try:
+        jcache(game, {1: 100, 2: 200}, {1: (b"old copy", 100), 2: (b"same copy", 200)}, 1000)
+        check("overlay: with none there, the client's copy", cf.group(99, 1, game), b"old copy")
+        jcache(over, None, {1: (b"new copy", 101)}, 2000)
+        fresh()
+        check("overlay: a fetch cut short before its index changes nothing",
+              (cf.group(99, 1, game), cf.descriptor(99, game)[1]["crc"]), (b"old copy", 100))
+        jcache(over, {1: 101, 2: 200}, {}, 2000)
+        fresh()
+        check("overlay: a newer index takes the overlay's copy", cf.group(99, 1, game), b"new copy")
+        check("overlay: and a group it did not fetch still comes from the client", cf.group(99, 2, game), b"same copy")
+        check("overlay: the index read is the newer one", cf.descriptor(99, game)[1]["crc"], 101)
+        jcache(game, {1: 102, 2: 200}, {1: (b"newest copy", 102)}, 3000)
+        fresh()
+        check("overlay: a client that wrote after it is in charge again", cf.group(99, 1, game), b"newest copy")
+        check("overlay: another cache than the live one never reads it", cf._overlay(99, tmp), None)
+    finally:
+        fresh()
+        cf.GAME, cf.OVERLAY = saved
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_js5_groups_split_and_never_vanish():
+    """OpenRS2 serves a group's files back to back with a trailer of size deltas, where the client
+    writes a header of offsets. Read with the client's split, every config group fetched for the
+    2026-10-26 update came back as nothing, and its records were left out without a word."""
+    import shutil
+    import sqlite3
+    import struct
+    from rs3mcp import cachefile as cf, ops
+
+    # two files, two chunks
+    raw = b"ab" + b"c" + b"d" + b"ef" + struct.pack(">iiii", 2, -1, 1, 1) + bytes([2])
+    check("js5 split: files gathered across chunks", cf.split_js5(raw, 2), [b"abd", b"cef"])
+    check("js5 split: one file is the whole group", cf.split_js5(b"xyz", 1), [b"xyz"])
+    check("js5 split: a trailer that runs off the front is refused", cf.split_js5(bytes([9]), 3), None)
+
+    tmp = tempfile.mkdtemp()
+    try:
+        path = os.path.join(tmp, "js5-99.jcache")
+        con = sqlite3.connect(path)
+        con.executescript("CREATE TABLE cache (KEY INTEGER PRIMARY KEY, DATA BLOB, VERSION INTEGER, CRC INTEGER);"
+                          "CREATE TABLE cache_index (KEY INTEGER PRIMARY KEY, DATA BLOB, VERSION INTEGER, CRC INTEGER);")
+        index = bytes([7]) + struct.pack(">IBH", 1, 0, 1) + struct.pack(">HIIHHH", 0, 5, 1, 2, 0, 1)
+        con.execute("insert into cache_index values (1, ?, 0, 0)", (bytes([0]) + struct.pack(">I", len(index)) + index,))
+        junk = b"not a group of two files"
+        con.execute("insert into cache values (0, ?, 1, 6)", (bytes([0]) + struct.pack(">I", len(junk)) + junk,))
+        con.commit()
+        con.close()
+        spec = {"index": 99, "group": None, "layout": "chunked"}
+        got = list(ops.records(spec, tmp))
+        check("records: a held group that will not split names each of its records",
+              [(cid, data) for cid, data in got], [(0, None), (1, None)])
+        check("records: and decoding one says why", ops.decode(spec, None)[1]["kind"], "unread")
+    finally:
+        for key in [k for k in cf._OPEN if k[0] == tmp]:
+            cf._OPEN.pop(key).close()
+        for kept in (cf._DESCRIPTORS, cf._STORED):
+            for key in [k for k in kept if k[0] == tmp]:
+                kept.pop(key)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_new_opcodes_are_learned():
+    """The 2026-10-21 update added invs 0x18 and varplayer 0x09, and every record carrying one
+    stopped decoding until somebody wrote it into the spec. Hidden from the spec again, each has to
+    be settled from the records alone, and what is learned has to load as unkXX until a spec names
+    the opcode."""
+    import copy
+    import shutil
+    from rs3mcp import ops
+    # one ambiguous record: stays unsettled
+    for name, op, want in (("invs", 0x18, "true"), ("varplayer", 0x09, None)):
+        spec = ops.load(name)
+        if op not in spec["ops"]:
+            check("learn: %s still has 0x%02X to hide" % (name, op), None, "it")
+            continue
+        trial = copy.copy(spec)
+        trial["ops"] = {k: v for k, v in spec["ops"].items() if k != op}
+        got = ops.settle(name, op, spec=trial)
+        if want is None:
+            check("learn: %s 0x%02X, which its one record cannot settle, is left alone" % (name, op), got, None)
+            continue
+        check("learn: %s 0x%02X is settled from its records" % (name, op),
+              got and (got["shape"] == want or want in got["alternatives"]), True, str(got)[:120])
+    check("learn: an opcode no record stops at settles nothing", ops.settle("invs", 0xFE), None)
+
+    tmp = tempfile.mkdtemp()
+    saved, cached = ops.LEARNED, dict(ops._LOADED)
+    try:
+        ops.LEARNED = os.path.join(tmp, "learned-ops.json")
+        with io.open(ops.LEARNED, "w", encoding="utf-8") as fh:
+            json.dump({"invs": {"0xFD": {"shape": "u16", "learned": "2026-10-31"},
+                                "0x18": {"shape": "u32", "learned": "2026-10-31"}}}, fh)
+        ops._LOADED.clear()
+        spec = ops.load("invs")
+        check("learn: a learned opcode loads as unkXX", spec["ops"][0xFD][0], "unkFD")
+        check("learn: and the spec wins where it names one", spec["ops"][0x18][0] != "unk18" or
+              ops.parse_shape("true") == spec["ops"][0x18][1], True)
+    finally:
+        ops.LEARNED = saved
+        ops._LOADED.clear()
+        ops._LOADED.update(cached)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_a_failed_decode_keeps_its_row():
+    """An update that outruns a spec must not cost a row the database read yesterday: the record
+    keeps the row it had, once, and one that is new in this update is left out but named."""
+    import shutil
+    import sqlite3
+    from rs3mcp import extract as ex
+    tmp = tempfile.mkdtemp()
+    try:
+        db = os.path.join(tmp, "old.db")
+        con = sqlite3.connect(db)
+        con.execute("create table config (type text, id integer, name text, api text, data text, display text)")
+        con.executemany("insert into config values ('items', ?, null, null, ?, null)",
+                        [(1, '{"name":"a"}'), (2, '{"name":"b"}'), (3, "{}")])
+        con.commit()
+        con.close()
+        os.makedirs(os.path.join(tmp, "stage", "items"))
+        path = os.path.join(tmp, "stage", "items", "items.batch.json")
+        with io.open(path, "w", encoding="utf-8") as fh:
+            fh.write('{"$schema":"ops","files":[{"$fileid":2,"name":"b"}]}')
+        kept = ex.keep_previous(os.path.join(tmp, "stage"), db, {"items": {1, 2, 3, 9}}, say=lambda m: None)
+        rows = json.load(io.open(path, encoding="utf-8"))["files"]
+        check("keep: a failed record keeps the row it had", sorted(r["$fileid"] for r in rows), [1, 2, 3])
+        check("keep: and the ones kept are named, a new one is not", kept, {"items": [1, 2, 3]})
+        check("keep: a row already staged is not staged twice",
+              [r for r in rows if r["$fileid"] == 2], [{"$fileid": 2, "name": "b"}])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_changed_groups():
+    """What a rebuild decodes is the groups whose crc moved since the manifest of the last one."""
+    import shutil
+    from rs3mcp import changed as ch
+    check("changed: a crc that moved, and a group that is new",
+          ch.moved({1: {0: 5, 1: 6}}, {1: {0: 5, 1: 7, 2: 8}}), {1: {1, 2}})
+    check("changed: a group that is gone", ch.moved({1: {0: 5, 1: 6}}, {1: {0: 5}}), {1: {1}})
+    check("changed: an archive the manifest never had moves whole", ch.moved({}, {3: {0: 1, 4: 2}}), {3: {0, 4}})
+    check("changed: nothing moved is nothing", ch.moved({1: {0: 5}}, {1: {0: 5}}), {})
+    path = os.path.join(tempfile.mkdtemp(), "built.json")
+    ch.save({1: {0: 5}}, {"interfaces": {7, 3}}, {"items": 256}, path)
+    got = ch.load(path)
+    check("changed: the manifest reads back as it was saved",
+          (got["archives"], got["failures"], got["chunks"]), ({1: {0: 5}}, {"interfaces": {3, 7}}, {"items": 256}))
+    shutil.rmtree(os.path.dirname(path), ignore_errors=True)
+
+
+def test_refresh_matches_extract():
+    """A rebuild decodes only the records in moved groups and takes the rest from the database.
+    For every type it touches, that has to stage exactly what a full extract does."""
+    import shutil
+    from rs3mcp import cachefile, changed as ch, common, extract as ex
+    before = ch.load()
+    db = os.path.join(common.ROOT, "rs3-cache.db")
+    if before is None or not os.path.exists(db) or ch.moved(before["archives"], ch.crcs()):
+        skip("refresh against a full extract", ["a database built from the cache as it is now"])
+        return
+    names = ["enums", "interfaces", "invs", "params", "models"]
+    # any groups will do
+    pick = {}
+    for name in names:
+        major = ex.where(name)[0]
+        groups = sorted(cachefile.descriptor(major) or {})
+        pick.setdefault(major, set()).update(groups[:2] + groups[-1:])
+    tmp = tempfile.mkdtemp()
+    try:
+        full, part = os.path.join(tmp, "full"), os.path.join(tmp, "part")
+        a_fail = ex.extract(full, names, say=lambda m: None)
+        b_fail = ex.refresh(part, db, pick, before, say=lambda m: None, names=names)
+
+        def rows(stage, name):
+            got = json.load(io.open(os.path.join(stage, name, name + ".batch.json"), encoding="utf-8"))["files"]
+            return sorted(json.dumps(r, sort_keys=True) for r in got)
+        for name in names:
+            check("refresh: %s stages what a full extract does" % name, rows(part, name) == rows(full, name), True)
+        check("refresh: and fails on the same records", {n: sorted(b_fail[n]) for n in names},
+              {n: sorted(a_fail[n]) for n in names})
+        # counted against the index
+        for name in names:
+            major, group, _layout, _size = ex.where(name)
+            desc, held = cachefile.descriptor(major) or {}, cachefile.stored(major)
+            declared = sum(len(desc[g]["files"]) for g in ([group] if group is not None else desc)
+                           if g in held and g in desc)
+            if name == "models":
+                declared = len([g for g in desc if g in held])
+            check("refresh: every %s record the index declares is staged or named" % name,
+                  len(rows(part, name)) + len(b_fail[name]), declared)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_calibration():
     """An update's opcode numbers, got back from a scrambled copy of this cache.
 
@@ -3578,7 +3823,7 @@ TESTS = [test_everything_compiles, test_escape_guard, test_brief_features_logged
          test_toolset_file, test_toolsets, test_spill_and_brief, test_answer_size, test_resources,
          test_continuation, test_protocol, test_claims,
          test_drift_runs, test_scan_cache, test_script_index, test_vars, test_iface, test_iface_live, test_iface_live_second_log,
-         test_cache, test_index, test_invariants, test_opcode_specs, test_update_check, test_name_lists, test_quests, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_calibration, test_script_names, test_cross_tool, test_regressions]
+         test_cache, test_index, test_invariants, test_opcode_specs, test_update_check, test_name_lists, test_quests, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_overlay_reads_the_newer_copy, test_js5_groups_split_and_never_vanish, test_new_opcodes_are_learned, test_a_failed_decode_keeps_its_row, test_changed_groups, test_refresh_matches_extract, test_calibration, test_script_names, test_cross_tool, test_regressions]
 
 
 _TIMES = []

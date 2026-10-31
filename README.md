@@ -147,8 +147,10 @@ here, the data included, stays on your machine. To add a file to the repo, name 
 To test, run `python rs3-mcp.py --selftest`. Tests that need something you don't have are skipped,
 and it tells you which.
 
-A rebuild won't install a new database if it reads less than the old one. Right now every config,
-model, clientscript and sprite reads.
+A rebuild fetches what your game cache is behind on from the [OpenRS2 archive](https://archive.openrs2.org),
+then rebuilds only what moved. It won't install a database that lost a row the old one had. A
+config it can't read keeps its old row, and an opcode a spec doesn't have yet is worked out from the
+records when they settle it. See [how the database is built](docs/rebuild.md).
 
 Every game update shuffles the clientscript instruction numbers. The rebuild works out the new ones
 itself. See [clientscripts](docs/clientscripts.md).

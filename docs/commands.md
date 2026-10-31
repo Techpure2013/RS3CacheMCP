@@ -33,7 +33,7 @@ as shown.
 | `rs3 help <tool>` | explains a tool |
 | `rs3 <tool> [arguments]` | runs a tool. Add `--json` for the raw answer |
 | `rs3 doctor` | checks your install |
-| `rs3 rebuild [--force\|--check\|--no-swap]` | builds the database |
+| `rs3 rebuild [--force\|--check\|--offline\|--no-swap]` | builds the database |
 | `rs3 setup [app\|all]` | adds rs3cache to AI apps |
 | `rs3 pool` | opens the scrying pool |
 | `rs3 docs [folder]` | rewrites the tools and database pages, and every page's links |
@@ -54,10 +54,13 @@ python rs3-mcp.py --diff                   shows which answers changed (-v for e
 ## Building the database
 
 ```
-python rebuild-cache.py                    same as rs3 rebuild: builds if the game has updated
+python rebuild-cache.py                    same as rs3 rebuild: fetches from OpenRS2, rebuilds what moved
 python rebuild-cache.py --check            exits with 1 if a rebuild is due, 0 if not
-python rebuild-cache.py --force            builds even if the game hasn't updated
+python rebuild-cache.py --force            builds everything, even if nothing moved
+python rebuild-cache.py --offline          leaves OpenRS2 out, uses the game cache as it is
 python rebuild-cache.py --no-swap          builds and checks, but doesn't install
+python -m rs3mcp.openrs2 [--check]         fetches (or lists) what the game cache is behind on
+python -m rs3mcp.changed                   lists what moved since the last build
 ```
 
 To run one step of the rebuild at a time ([how the database is built](rebuild.md)):

@@ -74,6 +74,8 @@ def decode(data, mesh=False):
     With mesh, the summary also carries "parts": each a dict of positions (x, y, z flat), colours
     (packed hsl, one per vertex, or one per face in version 3 and older) and faces as
     (material, triangle indices)."""
+    if data is None:
+        return None, {"kind": "unread", "why": "its group would not unpack"}
     b = Buf(data)
     out = {"parts": []} if mesh else {}
     try:
@@ -252,13 +254,17 @@ def _renders(b, meshes, n, tail):
 
 
 def records(root=None, minors=None):
-    """(model id, bytes) for every model, or the ones in the given groups."""
+    """(model id, bytes) for every model, or the ones in the given groups. One the client holds
+    that will not unpack comes as (id, None), to be named as a failure."""
     root = root or cachefile.GAME
     desc = cachefile.descriptor(MAJOR, root) or {}
+    held = cachefile.stored(MAJOR, root)
     for minor in (sorted(desc) if minors is None else minors):
         files = cachefile.files(MAJOR, minor, root, desc)
         if files:
             yield minor, files[min(files)]
+        elif minor in held and minor in desc:
+            yield minor, None
 
 
 def mesh(mid, root=None):

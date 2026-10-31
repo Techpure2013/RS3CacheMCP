@@ -1,13 +1,17 @@
 """
 Rebuild rs3-cache.db from the game cache, but only install it if it is actually better.
 
-    python rebuild-cache.py            rebuild if the game cache has moved ahead, else do nothing
+    python rebuild-cache.py            fetch what the client is behind on, rebuild what moved
     python rebuild-cache.py --check    say whether a rebuild is due and stop
-    python rebuild-cache.py --force    rebuild even if the game cache looks unchanged
+    python rebuild-cache.py --force    rebuild everything, even if nothing looks changed
+    python rebuild-cache.py --offline  leave OpenRS2 out of it, use the client's cache as it is
     python rebuild-cache.py --no-swap  build and verify, leave the current database in place
 
-The game cache is only newer when the client has actually updated, so the usual answer is that
-there is nothing to do and this costs a stat of forty files.
+First the groups the client's cache is behind on come from OpenRS2 (rs3mcp/openrs2.py), into an
+overlay beside it. Then only what moved is rebuilt: the crc of every group the database was built
+from is kept (rs3mcp/changed.py), and only the records in groups that moved are decoded. The rest
+come from the database as they are. Clientscripts and sprites are left alone unless their archive
+moved. The database file itself is written again from the whole stage, which takes under a minute.
 
 Installing is the part worth being careful about. A rebuild can go wrong in a way that still
 produces a plausible database -- an opcode the update changed stops decoding and a few thousand
@@ -55,6 +59,8 @@ INDEXER = os.path.join(ROOT, "rs3mcp", "buildindex.py")
 # only moved into place once the database built beside them has been accepted.
 ASSET_MODES = ["clientscript", "sprites"]
 LIVE_STAGE = os.path.join(DATA, "rs3-cache-stage")
+# marks a stage of moved groups only
+PARTIAL = "_moved-groups.json"
 
 # Types with a standing decode gap: a type listed here may fail up to its number, a type not listed
 # failing is what blocks an install. Add one only after looking at what fails and why.
@@ -78,20 +84,31 @@ def say(msg):
 
 
 def newest_game_file():
+    """The latest write to the client's cache or the OpenRS2 overlay over it."""
     try:
-        return max(os.path.getmtime(os.path.join(GAME, f))
-                   for f in os.listdir(GAME) if f.startswith("js5-"))
+        got = max(os.path.getmtime(os.path.join(GAME, f))
+                  for f in os.listdir(GAME) if f.startswith("js5-"))
     except (OSError, ValueError):
         return None
+    if os.path.isdir(cachefile.OVERLAY):
+        got = max([got] + [os.path.getmtime(os.path.join(cachefile.OVERLAY, f))
+                           for f in os.listdir(cachefile.OVERLAY) if f.startswith("js5-")])
+    return got
 
 
-def due():
-    """(is a rebuild due, why). The game cache carries its own timestamps, so no state is kept."""
+def due(moved=None):
+    """(is a rebuild due, why). moved is changed.moved() against the last build's manifest, None
+    when there is no manifest, and then the game cache's own timestamps decide."""
     game = newest_game_file()
     if game is None:
         return False, "the game cache is not readable at " + GAME
     if not os.path.exists(DB):
         return True, "there is no database yet"
+    if moved is not None:
+        n = sum(len(g) for g in moved.values())
+        if not n:
+            return False, "no group has moved since the database was built"
+        return True, "%d group(s) moved in %d archive(s) since the database was built" % (n, len(moved))
     built = os.path.getmtime(DB)
     when = time.strftime("%Y-%m-%d %H:%M", time.localtime(game))
     if game <= built:
@@ -99,18 +116,61 @@ def due():
     return True, "the game cache was updated %s, after the database was built" % when
 
 
-def extract():
-    """Every config type into a fresh stage, then the clientscripts. Returns failures per type."""
-    from rs3mcp.extract import extract as extract_configs
+def extract(before=None, moved=None):
+    """Every config type into a fresh stage, then the clientscripts and sprites. Returns failures
+    per type. Given the last build's manifest and what moved since, only the records in moved
+    groups are decoded, and an asset whose archive did not move is not staged, which leaves the
+    installed copy in place."""
+    from rs3mcp import extract as ex
 
     shutil.rmtree(STAGE, ignore_errors=True)
     os.makedirs(STAGE)
-    failures = {t: set(ids) for t, ids in extract_configs(STAGE, say=say).items()}
+    whole = before is None or moved is None
+    if whole:
+        failures = {t: set(ids) for t, ids in ex.extract(STAGE, say=say).items()}
+    else:
+        failures = {t: set(ids) for t, ids in ex.refresh(STAGE, DB, moved, before, say=say).items()}
+    learned(failures, before, moved, whole)
+    kept = ex.keep_previous(STAGE, DB, failures, say)
 
-    failures["clientscript"] = clientscripts(os.path.join(STAGE, "clientscript"))
+    if whole or 12 in moved:
+        failures["clientscript"] = clientscripts(os.path.join(STAGE, "clientscript"))
+    else:
+        say("clientscripts: none moved, the installed ones stay")
+        failures["clientscript"] = set(before["failures"].get("clientscript", ()))
     from rs3mcp import sprites
-    failures["sprites"] = set(timed("sprites", sprites.write, os.path.join(STAGE, "sprites"), None, say))
-    return failures
+    if whole:
+        failures["sprites"] = set(timed("sprites", sprites.write, os.path.join(STAGE, "sprites"), None, say))
+    elif sprites.MAJOR in moved:
+        # moved groups only
+        folder = os.path.join(STAGE, "sprites")
+        got = timed("sprites", sprites.write, folder, None, say, None, moved[sprites.MAJOR])
+        with open(os.path.join(folder, PARTIAL), "w", encoding="utf-8") as fh:
+            json.dump(sorted(moved[sprites.MAJOR]), fh)
+        failures["sprites"] = (set(before["failures"].get("sprites", ())) - set(moved[sprites.MAJOR])) | set(got)
+    else:
+        say("sprites: none moved, the installed ones stay")
+        failures["sprites"] = set(before["failures"].get("sprites", ()))
+    return failures, kept
+
+
+def learned(failures, before, moved, whole):
+    """Opcodes the specs lack, settled from the records that stop at them, and those types decoded
+    again with them. failures is updated in place."""
+    from rs3mcp import extract as ex, ops
+    got = ops.learn(failures, say=say)
+    if not got:
+        return
+    names = sorted(got)
+    if whole:
+        again = ex.extract(STAGE, names, say=say)
+    else:
+        more = {k: set(v) for k, v in moved.items()}
+        for name in names:
+            major, groups = ex.groups_of(name, failures[name])
+            more.setdefault(major, set()).update(groups)
+        again = ex.refresh(STAGE, DB, more, before, say=say, names=names)
+    failures.update({t: set(ids) for t, ids in again.items()})
 
 
 def clientscripts(folder):
@@ -179,13 +239,12 @@ def build():
             say(line.strip())
 
 
-def verify(failures):
+def verify(failures, kept=None):
     """What the new database gains and loses. Returns (ok, findings)."""
     problems, notes = [], []
     if not os.path.exists(DB):
-        # a first build: nothing to compare with, but the decode gaps still have to hold
         notes.append("first build, so there is no previous database to compare with")
-        gaps(failures, problems, notes)
+        gaps(failures, problems, notes, kept)
         return not problems, problems, notes
     old = sqlite3.connect(DB)
     new = sqlite3.connect(NEW)
@@ -214,7 +273,7 @@ def verify(failures):
         if A and len(B) < len(A) * (1 - SHRINK_LIMIT):
             problems.append("%s shrank from %d to %d, more than content removal explains"
                             % (ctype, len(A), len(B)))
-    gaps(failures, problems, notes)
+    gaps(failures, problems, notes, kept)
     notes.append("config rows %d -> %d, gained %d, lost %d (%d to a decode failure)"
                  % (old.execute("select count(*) from config").fetchone()[0],
                     new.execute("select count(*) from config").fetchone()[0],
@@ -240,20 +299,25 @@ def verify(failures):
     return not problems, problems, notes
 
 
-def gaps(failures, problems, notes):
-    """The decode gaps have to still be the size they were, and no other mode may have one."""
+def gaps(failures, problems, notes, kept=None):
+    """Decode failures past each type's standing gap, said out loud but not blocking.
+
+    A record that did not decode keeps the row it had (extract.keep_previous), or is new in this
+    update and had none to lose, so an update that outruns a spec still installs. What blocks is a
+    row going missing, which verify counts."""
+    kept = kept or {}
     for mode, allowed in sorted(KNOWN_UNDECODED.items()):
         got = len(failures.get(mode) or ())
-        if got > allowed:
-            problems.append("%s failed on %d records where its known gap is %d, so %d of them "
-                            "are new" % (mode, got, allowed, got - allowed))
-        elif got < allowed:
+        if got < allowed:
             notes.append("%s failed on %d where %d was expected, so the gap has shrunk; lower "
                          "the number in KNOWN_UNDECODED" % (mode, got, allowed))
     for mode, ids in sorted(failures.items()):
-        if ids and mode not in KNOWN_UNDECODED:
-            problems.append("%s had %d record(s) fail to decode, which is new"
-                            % (mode, len(ids)))
+        if len(ids or ()) <= KNOWN_UNDECODED.get(mode, 0):
+            continue
+        held = len(set(ids) & set(kept.get(mode, ())))
+        notes.append("ATTENTION %s: %d record(s) did not decode, past its gap of %d: %d kept the row "
+                     "they had, %d new and unread, e.g. %s"
+                     % (mode, len(ids), KNOWN_UNDECODED.get(mode, 0), held, len(ids) - held, sorted(ids)[:6]))
 
 
 def swap_assets():
@@ -267,12 +331,36 @@ def swap_assets():
         os.makedirs(LIVE_STAGE, exist_ok=True)
         bak = dst + ".bak"
         shutil.rmtree(bak, ignore_errors=True)
+        if os.path.exists(os.path.join(src, PARTIAL)) and os.path.isdir(dst):
+            lay_over(mode, src, dst, bak)
+            continue
         kept = os.path.isdir(dst)
         if kept:
             os.rename(dst, bak)
         shutil.move(src, dst)
         say("%-14s %d files installed%s" % (mode, len(os.listdir(dst)),
                                             ", previous kept as " + os.path.basename(bak) if kept else ""))
+
+
+def lay_over(mode, src, dst, bak):
+    """A stage of moved groups over the installed folder: each file written replaces its old copy,
+    and a moved group with no file now (removed, or it did not draw) loses it. What was replaced
+    or removed goes to bak."""
+    with open(os.path.join(src, PARTIAL), encoding="utf-8") as fh:
+        moved = set(json.load(fh))
+    os.makedirs(bak)
+    new = {f for f in os.listdir(src) if f != PARTIAL}
+    replaced = 0
+    for g in moved:
+        name = "%s-%d.png" % (mode, g)
+        if os.path.exists(os.path.join(dst, name)):
+            shutil.move(os.path.join(dst, name), os.path.join(bak, name))
+            replaced += 1
+    for f in new:
+        shutil.move(os.path.join(src, f), os.path.join(dst, f))
+    shutil.rmtree(src, ignore_errors=True)
+    say("%-14s %d of %d moved groups written over the installed ones, the %d replaced kept in %s"
+        % (mode, len(new), len(moved), replaced, os.path.basename(bak)))
 
 
 def swap():
@@ -372,8 +460,18 @@ def main():
     check_only = "--check" in sys.argv
     force = "--force" in sys.argv
     no_swap = "--no-swap" in sys.argv
+    from rs3mcp import changed, openrs2
 
-    needed, why = due()
+    if "--offline" not in sys.argv:
+        try:
+            timed("openrs2", openrs2.sync, changed.majors(), check_only, say)
+        except OSError as e:
+            say("openrs2: not reached (%s), going on with the client's cache" % str(e)[:120])
+    # crcs before extracting
+    now = changed.crcs()
+    before = None if force or not os.path.exists(DB) else changed.load()
+    moved = changed.moved(before["archives"], now) if before else None
+    needed, why = due(moved)
     print("cache rebuild: %s" % why)
     if check_only:
         return 0 if not needed else 1
@@ -381,12 +479,12 @@ def main():
         return 0
 
     start = time.time()
-    say("extracting from the game cache")
-    failures = timed("extract", extract)
+    say("extracting from the game cache%s" % (", only what moved" if moved is not None else ""))
+    failures, kept = timed("extract", extract, before, moved)
     say("building")
     timed("build", build)
     say("checking it against the database it would replace")
-    ok, problems, notes = timed("verify", verify, failures)
+    ok, problems, notes = timed("verify", verify, failures, kept)
     for n in notes:
         say(n)
     if not ok:
@@ -404,6 +502,8 @@ def main():
               % (os.path.basename(DB), os.path.basename(NEW)))
         return 1
     timed("assets", swap_assets)
+    from rs3mcp import extract as ex
+    changed.save(now, failures, ex.chunks())
     # what is left of the stage is decoded json the database now holds, a few hundred MB nothing
     # reads again. A build that is not installed keeps it to look at.
     shutil.rmtree(STAGE, ignore_errors=True)

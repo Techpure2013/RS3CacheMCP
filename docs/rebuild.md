@@ -4,6 +4,7 @@
 
 On this page
 - [When it runs](#when-it-runs)
+- [Only what changed](#only-what-changed)
 - [Stages](#stages)
   - [Extract](#extract)
   - [Build](#build)
@@ -17,14 +18,33 @@ one, and only swaps it in if it passes. Each step prints how long it took.
 
 ## When it runs
 
-By default, it first checks whether the game has updated since the last build. If it hasn't, it
-stops there.
+First it asks the [OpenRS2 archive](https://archive.openrs2.org) for the newest RS3 cache, which it
+pulls straight from Jagex. The game only downloads a file when it needs one, so your cache can be
+behind after an update. Only the files that differ from yours are fetched, checked against their
+checksums, and kept in `data/openrs2/`. Your game's own files are never touched. After the
+2026-10-26 update that was 118 files in 33 seconds.
+
+Then it checks whether anything moved since the last build. If nothing did, it stops there.
 
 | Flag | What it does |
 |---|---|
-| `--force` | builds even if the game hasn't updated |
-| `--check` | only checks. Exits with 1 if a rebuild is due, 0 if not |
+| `--force` | builds everything from scratch, even if nothing moved |
+| `--check` | only checks, fetching nothing. Exits with 1 if a rebuild is due, 0 if not |
+| `--offline` | leaves OpenRS2 out of it and uses your game cache as it is |
 | `--no-swap` | builds and checks, but doesn't install the new database |
+
+`python -m rs3mcp.openrs2 --check` lists what your cache is behind on, and
+`python -m rs3mcp.changed` lists what moved since the last build.
+
+## Only what changed
+
+Every build writes the checksum of every file it was built from to `data/rs3-cache-built.json`. The
+next build compares against it and only reads the configs in files that moved. Everything else is
+copied from the current database, which holds it exactly as it was read last time. Clientscripts
+and sprites are left alone unless theirs moved, and only the sprites that moved are redrawn.
+
+The database file itself is still written out whole, which takes under a minute. The first build,
+or one with `--force`, reads everything.
 
 ## Stages
 
@@ -54,7 +74,22 @@ Everything is built in `data/rs3-cache-stage-new` first. If a build fails its ch
 Each kind of config is read using its spec in `rs3mcp/specs/` ([config specs](specs.md)). Models are
 read by `rs3mcp/models.py` ([models](models.md)). The work is split across your CPU cores, up to 32.
 
-A config that can't be read all the way to its end is left out, and listed in `_failures.json`.
+A config that can't be read all the way to its end is listed in `_failures.json`. Then:
+
+- If it stopped at an opcode the spec doesn't have, the rebuild tries to work it out from every
+  record that has it. It only takes an answer when every shape that fits reads the rest of each
+  record the same way. Then it's saved to `data/learned-ops.json` as `unkXX`, the build reads with
+  it, and it tells you. Hidden from their specs, 24 of 24 opcodes it settled came back right. When
+  the records can't decide, as with a single record that reads two ways, it doesn't guess.
+- Anything still unread keeps the row the old database had for it, and is named in the output with
+  `ATTENTION`. A config new in this update has no old row, so it's left out and named.
+
+So an update that adds an opcode doesn't stop the build, and nothing you could look up yesterday
+disappears today. A change to how an existing opcode is laid out still needs a person to fix the
+spec, but until then you keep the old rows.
+
+A file the game holds but that can't be unpacked counts as unread too, record by record, so it can
+never just quietly drop out.
 
 Clientscripts are turned back into code by the decompiler ([clientscripts](clientscripts.md)). Every
 game update shuffles the script instructions, so the rebuild works out the new order first, which
@@ -63,7 +98,8 @@ everything else. Your old scripts stay.
 
 Sprites are saved as `sprites-<id>.png`, each at the size the game draws it. They take up about
 2.8 GB, mostly loading screens. The old set is kept as a backup, so the data folder ends up around
-7 GB. If a sprite can't be read, the new database isn't installed.
+7 GB. When only some sprites moved, just those are redrawn and written over the installed set, and
+the ones they replace are kept in `sprites.bak`.
 
 ### Build
 
@@ -98,13 +134,11 @@ locs keep the name you see in game but lose their `CONFIG_NAME`.
 
 The new database is only installed if all of these are true:
 
-- Nothing the old database could read has become unreadable.
+- No row the old database had has gone missing because it couldn't be read.
 - No table has shrunk by more than 1 in 50. Game updates don't remove that much.
-- Every kind of config that could be read before still can be.
 
 If the game really did remove something, that's fine. It's reported, and the install goes ahead.
-
-On a first build there's nothing to compare with, so it only checks that everything could be read.
+Configs that couldn't be read are reported too, but they keep their old rows, so they don't stop it.
 
 ### Install
 

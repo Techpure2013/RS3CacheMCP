@@ -173,8 +173,8 @@ def _write_part(job):
     return written, failed, absent
 
 
-def write(folder, root=None, say=print, workers=None):
-    """Every sprite this client holds into folder.
+def write(folder, root=None, say=print, workers=None, only=None):
+    """Every sprite this client holds into folder, or with only, just those groups.
 
     Returns {group: why} for the ones whose bytes are here and did not decode. A group the client
     has never downloaded is reported but not returned, so a partly streamed cache is not treated
@@ -183,8 +183,10 @@ def write(folder, root=None, say=print, workers=None):
     import multiprocessing
     root = root or cachefile.GAME
     groups = sorted(cachefile.descriptor(MAJOR, root) or {})
+    if only is not None:
+        groups = sorted(set(groups) & set(only))
     os.makedirs(folder, exist_ok=True)
-    workers = workers or min(32, os.cpu_count() or 1)
+    workers = max(1, min(workers or min(32, os.cpu_count() or 1), len(groups)))
     step = max(1, len(groups) // (workers * 4))
     jobs = [(folder, root, groups[i:i + step]) for i in range(0, len(groups), step)]
     written, failed, absent = 0, {}, set()

@@ -24,7 +24,7 @@ the rs3cache folder to your PATH. `python rs3.py` works too.
 | `rs3 help <tool>` | explains a tool and what you can give it |
 | `rs3 <tool> ...` | runs a tool. `rs3 <tool> --help` is the same as `rs3 help <tool>` |
 | `rs3 doctor` | checks your install and tells you what to fix |
-| `rs3 rebuild` | builds the database. Add `--force` to build even if the game hasn't updated, `--check` to only check, or `--no-swap` to build without installing it |
+| `rs3 rebuild` | fetches what your cache is behind on from OpenRS2, then rebuilds only what moved. Add `--force` to build everything, `--check` to only check, `--offline` to leave OpenRS2 out, or `--no-swap` to build without installing it |
 | `rs3 setup` | adds rs3cache to your AI apps (see [AI apps](apps.md)) |
 | `rs3 pool` | opens the scrying pool in your browser |
 | `rs3 docs` | rewrites the tools and database pages of these docs |
