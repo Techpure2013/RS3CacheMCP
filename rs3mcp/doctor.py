@@ -69,9 +69,15 @@ def checks():
             found = "%d configs, built %s" % (rows, _when(built))
         except sqlite3.Error as e:
             found = "unreadable: %s" % e
-        stale = newest and newest > built
-        add("warn" if stale else "ok", "Database", found,
-            "the game has updated since, so run: rs3 rebuild" if stale else None)
+        from rs3mcp import updates
+        moved = updates.moved_since_build() if caches else 0
+        if moved is None:
+            stale = newest and newest > built
+            why = "the game has updated since, so run: rs3 rebuild"
+        else:
+            stale = moved > 0
+            why = "a game update moved %d groups since, so run: rs3 rebuild, which redoes only those" % moved
+        add("warn" if stale else "ok", "Database", found, why if stale else None)
 
     index = common.sidecar("item_link")
     add("ok" if index is not None else "warn", "Search index",

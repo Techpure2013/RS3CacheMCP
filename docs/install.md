@@ -75,7 +75,9 @@ Run:
 rs3 rebuild
 ```
 
-If the game hasn't updated, it does nothing. `rs3 doctor` also tells you when a rebuild is due.
+If the game hasn't updated, it does nothing. `rs3 doctor` also tells you when a rebuild is due, and
+so does your AI app: the next tool answer after a game update carries a notice, once, and the same
+goes for a newer rs3cache on GitHub.
 
 A rebuild never makes things worse. If the new database reads less than the old one, it keeps the
 old one. See [how the database is built](rebuild.md) for what it checks.

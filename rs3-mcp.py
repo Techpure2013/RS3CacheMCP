@@ -46,6 +46,7 @@ from rs3mcp import addons, common
 from rs3mcp import gateway
 from rs3mcp import howto
 from rs3mcp import resources
+from rs3mcp import updates
 from rs3mcp import (cache, collision, families, cachediff, drift, quests, research, scriptrefs,
                     dbtable, iface, script, trace, vars, wiki)
 
@@ -316,7 +317,11 @@ def handle(req):
             return {"content": [{"type": "text", "text": "error: %s" % e}], "isError": True}
         # No structuredContent. The spec makes it optional and it is the same bytes a second
         # time: measured at +11,904 tokens over ten real answers, for a copy nothing here reads.
-        return {"content": [{"type": "text", "text": text}]}
+        content = [{"type": "text", "text": text}]
+        said = updates.notice()
+        if said:
+            content.append({"type": "text", "text": "rs3cache notice, tell the user: " + said})
+        return {"content": content}
     raise LookupError(method)
 
 

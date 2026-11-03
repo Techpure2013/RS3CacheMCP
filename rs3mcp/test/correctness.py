@@ -408,6 +408,7 @@ def test_update_check():
     from rs3mcp import common, poollog, updates
 
     was_read, was_env = updates._read, os.environ.get("RS3_UPDATES")
+    was_head, was_game, was_shown = updates.local_head, dict(updates._GAME), updates._SHOWN[0]
     try:
         head = subprocess.run(["git", "-C", common.BASE, "rev-parse", "HEAD"],
                               capture_output=True, text=True).stdout.strip()
@@ -429,8 +430,21 @@ def test_update_check():
         check("updates: switched off it says so, looks at nothing and starts no thread",
               ("off" in updates.status(), updates.check().get("skipped"), updates.start()),
               (True, "RS3_UPDATES=off", None))
+
+        # the notice a tool reply carries
+        os.environ.pop("RS3_UPDATES", None)
+        updates._read = lambda: {"remote": "b" * 40}
+        updates.local_head = lambda: "a" * 40
+        updates._GAME.update(at=now, moved=12)
+        updates._SHOWN[0] = None
+        first, again = updates.notice() or "", updates.notice()
+        check("updates: a reply says GitHub moved and a rebuild is due, and says it once",
+              ("git pull" in first, "12 groups moved" in first, "only what moved" in first, again),
+              (True, True, True, None))
     finally:
-        updates._read = was_read
+        updates._read, updates.local_head = was_read, was_head
+        updates._GAME.update(was_game)
+        updates._SHOWN[0] = was_shown
         if was_env is None:
             os.environ.pop("RS3_UPDATES", None)
         else:

@@ -157,6 +157,48 @@ def status():
     return "github is at %s, this copy is at %s -- run: git pull" % (remote[:7], local[:7])
 
 
+# moved group count and its time
+_GAME = {"at": 0, "moved": None}
+_SHOWN = [None]
+
+
+def moved_since_build():
+    """Groups a game update moved since the database was built. None before the first build."""
+    from rs3mcp import changed
+    before = changed.load()
+    if before is None or not os.path.exists(common.DB):
+        return None
+    got = changed.moved(before["archives"], changed.crcs(archives=sorted(before["archives"])))
+    return sum(map(len, got.values()))
+
+
+def _count_moved():
+    _GAME["moved"] = moved_since_build()
+
+
+def notice():
+    """A line for the AI to pass on, once each time it changes. None when there is nothing new.
+
+    Counting the moved groups reads every archive's index, about a second, so it runs beside the
+    call and the next one says what it found. The client downloading groups as you play does not
+    move them, only a game update does."""
+    if time.time() - _GAME["at"] > EVERY:
+        _GAME["at"] = time.time()
+        threading.Thread(target=_count_moved, name="moved-groups", daemon=True).start()
+    said = []
+    remote, local = _read().get("remote"), local_head()
+    if not off() and remote and local and remote != local:
+        said.append("a newer rs3cache is on GitHub, run git pull in %s" % common.BASE)
+    if _GAME["moved"]:
+        said.append("the game updated since the database was built (%d groups moved), run rs3 rebuild, "
+                    "which redoes only what moved" % _GAME["moved"])
+    text = "; ".join(said) or None
+    if text == _SHOWN[0]:
+        return None
+    _SHOWN[0] = text
+    return text
+
+
 def start():
     """Look every half hour in the background, for as long as the server runs."""
     if off():
