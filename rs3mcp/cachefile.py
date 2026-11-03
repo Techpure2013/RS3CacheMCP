@@ -25,8 +25,21 @@ import sqlite3
 import struct
 import zlib
 
-# where the launcher keeps the cache
-GAME = os.environ.get("RS3MCP_GAME_CACHE") or "C:/ProgramData/Jagex/RuneScape"
+def _default_game():
+    """Where the launcher keeps the cache: Jagex's on Windows, Bolt's on Linux, Flatpak or not."""
+    if os.name == "nt":
+        return "C:/ProgramData/Jagex/RuneScape"
+    home = os.path.expanduser("~")
+    for path in (os.path.join(home, ".var/app/com.adamcake.Bolt/data/bolt-launcher/Jagex/RuneScape"),
+                 os.path.join(home, ".local/share/bolt-launcher/Jagex/RuneScape")):
+        if os.path.isdir(path):
+            return path
+    return "C:/ProgramData/Jagex/RuneScape"
+
+
+GAME = os.environ.get("RS3MCP_GAME_CACHE") or _default_game()
+# the beta client's own folder
+BETA = bool(re.search(r"-BETA[\\/]*$", GAME))
 # groups newer than the client's, fetched from OpenRS2
 OVERLAY = os.environ.get("RS3MCP_OVERLAY") or os.path.join(
     os.environ.get("RS3MCP_DATA") or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data"),
@@ -155,7 +168,7 @@ _DESCRIPTORS = {}
 
 def _overlay(major, root):
     """The overlay for this index, when root is the live cache and the overlay has one."""
-    if os.path.normcase(os.path.abspath(root)) != os.path.normcase(os.path.abspath(GAME)):
+    if BETA or os.path.normcase(os.path.abspath(root)) != os.path.normcase(os.path.abspath(GAME)):
         return None
     return _open(OVERLAY, major)
 

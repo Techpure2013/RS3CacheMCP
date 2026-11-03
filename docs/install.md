@@ -4,8 +4,8 @@
 
 ## What you need
 
-- **Windows.** rs3cache reads the cache the Windows game client downloads. It lives in
-  `C:\ProgramData\Jagex\RuneScape` unless you moved it.
+- **Windows or Linux.** rs3cache reads the cache the game client downloads. On Windows it lives in
+  `C:\ProgramData\Jagex\RuneScape`; on Linux, see [Linux](#linux).
 - **RuneScape 3, logged in at least once**, so the game has downloaded its cache.
 - **Python 3.10 or newer.** It's been tested on 3.12 and 3.13. When you install Python from
   python.org, tick "Add python.exe to PATH".
@@ -38,6 +38,34 @@ To run `rs3` from any folder, add the rs3cache folder to your PATH. Open Start, 
 environment variables for your account", select Path, click New, and paste the folder's path.
 
 If you moved your game cache, set `RS3MCP_GAME_CACHE` to where it is before you run anything.
+
+## Linux
+
+It runs on Linux too. It has been used with Bolt on EndeavourOS.
+
+- **The cache** is found without a setting where Bolt keeps it, as a Flatpak
+  (`~/.var/app/com.adamcake.Bolt/data/bolt-launcher/Jagex/RuneScape`) or installed normally
+  (`~/.local/share/bolt-launcher/Jagex/RuneScape`). Anywhere else, set `RS3MCP_GAME_CACHE`. For the
+  beta, point it at the `RuneScape-BETA` folder beside it. OpenRS2 only keeps live caches, so a beta
+  build uses what the client has downloaded, and the self-test skips the checks whose answers
+  were measured on live.
+- **Run it with `python3`**: `python3 rs3.py doctor`, `python3 rs3.py rebuild`.
+- **Live interface dumps** from the Quest Helper editor need `RS3_IFACE_LOG` set to the editor's
+  `rec-iface.jsonl`.
+- **Registering with Claude Code** by hand, when `rs3 setup` doesn't fit:
+
+  ```
+  claude mcp add -s user rs3cache \
+    -e RS3MCP_GAME_CACHE="$HOME/.var/app/com.adamcake.Bolt/data/bolt-launcher/Jagex/RuneScape" \
+    -e RS3_IFACE_LOG="<editor folder>/rec-iface.jsonl" \
+    -- python3 "<rs3cache folder>/rs3-mcp.py"
+  ```
+
+  Use `-s user`. Without it the server is only registered for the folder you ran the command in.
+  Reload the editor window afterwards. With only the VS Code extension installed, `claude` isn't on
+  your PATH, but the extension ships it: it's
+  `~/.vscode-oss/extensions/anthropic.claude-code-<version>-linux-x64/resources/native-binary/claude`
+  (`~/.vscode/...` with the Microsoft build).
 
 ## After a game update
 

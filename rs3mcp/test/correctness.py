@@ -122,12 +122,13 @@ def test_cache():
     check("cache: loc morph sentinel", NONE_CHILD.get("objects"), 32767,
           "using 65535 for both read 32767 as a real child 30,309 times")
     c = connect()
-    n = c.execute("select count(*) from varbit").fetchone()[0]
-    # player varbits from the cache, not the csv
-    approx("cache: varbit rows", n, 51113, 200)
-    n = c.execute("select count(distinct id/65536) from config "
-                  "where type='interfaces'").fetchone()[0]
-    approx("cache: distinct interfaces", n, 1871, 20)
+    if needs("cache counts", "live cache"):
+        n = c.execute("select count(*) from varbit").fetchone()[0]
+        # player varbits from the cache, not the csv
+        approx("cache: varbit rows", n, 51482, 200)
+        n = c.execute("select count(distinct id/65536) from config "
+                      "where type='interfaces'").fetchone()[0]
+        approx("cache: distinct interfaces", n, 1892, 20)
 
 
 # --------------------------------------------------------------------------- sidecar index
@@ -1681,11 +1682,12 @@ def test_maprender():
         check("maprender: Lumbridge's square draws four pixels a tile, in more than flat colours",
               (img.size, colours > 500), ((256, 256), True))
         cfg = maprender._Configs()
-        check("maprender: tile floor ids count from 1: the keep's dining hall is the wood brown of the "
-              "config one below its tile id, and the water cut draws nothing",
-              (cfg.colour("overlays", 273), cfg.colour("overlays", 42)), ((102, 70, 46), None))
-        check("maprender: a Lumbridge swamp pool is teal, the River Lum grey-blue",
-              (cfg.water(3206, 3182), cfg.water(3239, 3238)), (maprender.SWAMP, maprender.WATER))
+        if needs("map colours", "live cache"):
+            check("maprender: tile floor ids count from 1: the keep's dining hall is the wood brown of the "
+                  "config one below its tile id, and the water cut draws nothing",
+                  (cfg.colour("overlays", 273), cfg.colour("overlays", 42)), ((102, 70, 46), None))
+            check("maprender: a Lumbridge swamp pool is teal, the River Lum grey-blue",
+                  (cfg.water(3206, 3182), cfg.water(3239, 3238)), (maprender.SWAMP, maprender.WATER))
 
 
 def test_maplocs():
@@ -2229,6 +2231,81 @@ def test_a_failed_decode_keeps_its_row():
               [r for r in rows if r["$fileid"] == 2], [{"$fileid": 2, "name": "b"}])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_live_dumps_list_each_component_once():
+    """The editor's ifacefind walks from component 0 and again from 1, so interface 518 came back
+    as 376 rows for 60 components, one npc's row eight times."""
+    from rs3mcp import ifacelive as L
+    cols = ["static", "dynamic", "depth", "text"]
+    d = {"columns": cols, "rows": [[0, -1, 0, ""], [1, -1, 1, "Fern"], [1, -1, 0, "Fern"],
+                                   [1, 3, 2, "x"], [1, 3, 1, "x"], [2, -1, 1, "y"]]}
+    got = L._once(dict(d))
+    check("dumps: each component once", [(r[0], r[1]) for r in got["rows"]], [(0, -1), (1, -1), (1, 3), (2, -1)])
+    check("dumps: the shallowest copy is kept", [r[2] for r in got["rows"]], [0, 0, 1, 1])
+    check("dumps: and the repeats are counted", got["repeats"], 2)
+
+
+def test_name_lists_take_the_clients_names():
+    """The lists were a June snapshot, so Secrets of Amberfell's vars were in the client and no list.
+    A harvest adds what the lists lack, renames what the client renamed, and writes a varbit with
+    its base var and mask."""
+    import csv
+    import shutil
+    from rs3mcp import namesync as N
+    tmp = tempfile.mkdtemp()
+    try:
+        path = os.path.join(tmp, "Vars - VarPlayer (1).csv")
+        with io.open(path, "w", encoding="utf-8", newline="") as fh:
+            csv.writer(fh).writerows([["ID", "CONFIG_NAME", "ValueType", "CONFIG_NAME - BaseVar", "BaseVar ID", "Varbit Mask"],
+                                      ["101", "QUEST_POINTS", "INTEGER", "", "", ""],
+                                      ["7", "OLD_NAME", "INTEGER", "", "", ""]])
+        harvest = [{"id": 101, "configName": "QUEST_POINTS", "valueType": 0},
+                   {"id": 7, "configName": "NEW_NAME", "valueType": 0},
+                   {"id": 9000, "configName": "QUEST_WENDLE_SECRETS_BASEVAR1", "valueType": 0},
+                   {"id": -52652, "configName": "QUEST_WENDLE_SECRETS_MAIN", "valueType": 0,
+                    "isVarBit": True, "varBitMask": 0xFF, "baseVarId": 9000}]
+        head, rows, added, renamed = N.merge("VarPlayer", harvest, path)
+        by = {r[0]: r for r in rows}
+        check("names: an id the list lacked is added", sorted(c for c, _n in added), [-52652, 9000])
+        check("names: one the client renamed takes its name", renamed, [(7, "OLD_NAME", "NEW_NAME")])
+        check("names: a varbit comes with its base var and mask",
+              by["-52652"], ["-52652", "QUEST_WENDLE_SECRETS_MAIN", "INTEGER", "QUEST_WENDLE_SECRETS_BASEVAR1", "9000", "0xFF"])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_literal_search_says_the_index_narrowed_it():
+    """`in the woods` scanned 2 files and found nothing, which read as a search that gave up. The
+    word index had narrowed it to the only two scripts holding those words."""
+    from rs3mcp import script as S
+    if not S._files():
+        skip("literal search narrowing", ["decompiled clientscripts"])
+        return
+    got = S.tool_script({"pattern": "zzqx in the zzqy"})
+    check("search: a phrase whose words are nowhere says so without opening a file", got["filesScanned"], 0)
+    got = S.tool_script({"pattern": "in the woods"})
+    check("search: a literal phrase is narrowed by the index", got.get("narrowedByIndex"), True)
+    if not got["hits"]:
+        check("search: and a miss says every script was covered", "Every script was covered" in (got.get("note") or ""), True)
+
+
+def test_a_beta_cache_stays_beta():
+    """A build pointed at RuneScape-BETA failed 40 checks, 2 claims and 3 goldens measured on live,
+    and OpenRS2, which keeps only live caches, would have laid live groups over it."""
+    from rs3mcp import cachefile, openrs2
+    from rs3mcp.test import claims, workspace
+    was = cachefile.BETA
+    cachefile.BETA = True
+    try:
+        said = []
+        got = openrs2.sync([2], check=True, say=said.append)
+        check("beta: nothing is fetched from OpenRS2, and it says why", (got, any("beta" in s for s in said)), ({}, True))
+        check("  and no overlay is read", cachefile._overlay(2, cachefile.GAME), None)
+        check("beta: the live numbers are skipped, with the reason", bool(workspace.missing("live cache")), True)
+        check("  and no written count is rewritten", claims.rewrite(), [])
+    finally:
+        cachefile.BETA = was
 
 
 def test_changed_groups():
@@ -3823,7 +3900,7 @@ TESTS = [test_everything_compiles, test_escape_guard, test_brief_features_logged
          test_toolset_file, test_toolsets, test_spill_and_brief, test_answer_size, test_resources,
          test_continuation, test_protocol, test_claims,
          test_drift_runs, test_scan_cache, test_script_index, test_vars, test_iface, test_iface_live, test_iface_live_second_log,
-         test_cache, test_index, test_invariants, test_opcode_specs, test_update_check, test_name_lists, test_quests, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_overlay_reads_the_newer_copy, test_js5_groups_split_and_never_vanish, test_new_opcodes_are_learned, test_a_failed_decode_keeps_its_row, test_changed_groups, test_refresh_matches_extract, test_calibration, test_script_names, test_cross_tool, test_regressions]
+         test_cache, test_index, test_invariants, test_opcode_specs, test_update_check, test_name_lists, test_quests, test_sprites, test_maplocs, test_maptiles, test_mapwalk, test_mapnear, test_mapscene, test_worldaudit, test_memo, test_agent_view, test_dev_loop, test_zone, test_zone_ui, test_research_store, test_citation_check, test_research_find, test_research_network, test_research_cli, test_research_review, test_research_source_is_not_html, test_research_json_reads_as_text, test_research_gate, test_gateway, test_chat, test_runner, test_context, test_judge, test_unseen_numbers_and_files, test_claim_head, test_second_opinion, test_labels, test_all_registered,test_maprender, test_big_model, test_sprite_names, test_textures, test_docs, test_wiki_offline, test_dds_rounding, test_kept_numbers, test_likeliest, test_stack_context_sets_aside_unread, test_stack_ties_two_unknowns, test_stack_ties_ops_of_one_script, test_overlay_reads_the_newer_copy, test_js5_groups_split_and_never_vanish, test_new_opcodes_are_learned, test_a_failed_decode_keeps_its_row, test_live_dumps_list_each_component_once, test_name_lists_take_the_clients_names, test_literal_search_says_the_index_narrowed_it, test_a_beta_cache_stays_beta, test_changed_groups, test_refresh_matches_extract, test_calibration, test_script_names, test_cross_tool, test_regressions]
 
 
 _TIMES = []

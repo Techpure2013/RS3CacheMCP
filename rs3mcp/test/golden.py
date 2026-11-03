@@ -171,7 +171,8 @@ def run_all():
         key = _key(name, args)
         where[key] = home
         t = by.get(name)
-        gone = workspace.missing(*need) if t else workspace.missing("add-on")
+        # recorded on the live cache
+        gone = workspace.missing("live cache", *need) if t else workspace.missing("add-on")
         if gone:
             skipped[key] = gone
             continue

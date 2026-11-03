@@ -96,9 +96,10 @@ def newest_game_file():
     return got
 
 
-def due(moved=None):
+def due(moved=None, renamed=False):
     """(is a rebuild due, why). moved is changed.moved() against the last build's manifest, None
-    when there is no manifest, and then the game cache's own timestamps decide."""
+    when there is no manifest, and then the game cache's own timestamps decide. renamed is the
+    name lists changing since, which only the build step needs."""
     game = newest_game_file()
     if game is None:
         return False, "the game cache is not readable at " + GAME
@@ -106,6 +107,8 @@ def due(moved=None):
         return True, "there is no database yet"
     if moved is not None:
         n = sum(len(g) for g in moved.values())
+        if not n and renamed:
+            return True, "no group moved, but the name lists changed since the database was built"
         if not n:
             return False, "no group has moved since the database was built"
         return True, "%d group(s) moved in %d archive(s) since the database was built" % (n, len(moved))
@@ -467,11 +470,17 @@ def main():
             timed("openrs2", openrs2.sync, changed.majors(), check_only, say)
         except OSError as e:
             say("openrs2: not reached (%s), going on with the client's cache" % str(e)[:120])
+    if not check_only:
+        from rs3mcp import namesync
+        try:
+            namesync.sync(say=say)
+        except SystemExit:
+            pass
     # crcs before extracting
     now = changed.crcs()
     before = None if force or not os.path.exists(DB) else changed.load()
     moved = changed.moved(before["archives"], now) if before else None
-    needed, why = due(moved)
+    needed, why = due(moved, bool(before) and before.get("names") != changed.names_stamp())
     print("cache rebuild: %s" % why)
     if check_only:
         return 0 if not needed else 1

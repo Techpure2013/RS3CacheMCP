@@ -269,7 +269,7 @@ def rewrite(claims=None):
     from rs3mcp.test import workspace
     moved = []
     for path, pattern, live, *need in claims or CLAIMS:
-        if workspace.missing(*need):
+        if workspace.missing("live cache", *need):
             continue
         written = _written(path, pattern)
         try:
@@ -334,7 +334,8 @@ def run_claims(check, claims, rounded=(), skip=None):
     from rs3mcp.test import workspace
     for path, pattern, live, *need in claims:
         label = "%s: %s" % (os.path.basename(path), pattern[:44])
-        gone = workspace.missing(*need)
+        # the sentences count the live game
+        gone = workspace.missing("live cache", *need)
         if gone:
             if skip:
                 skip("%s claim \"%s\"" % (os.path.basename(path), re.sub(r"\([^)]*\)", "N", pattern)), gone)

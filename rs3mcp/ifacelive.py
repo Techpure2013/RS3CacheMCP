@@ -75,9 +75,34 @@ def _load():
                 if iid not in dumps or d.get("t", 0) >= dumps[iid].get("t", 0):
                     d = dict(d)
                     d["from"] = path
-                    dumps[iid] = d
+                    dumps[iid] = _once(d)
     _CACHE["stamp"], _CACHE["dumps"] = stamp, dumps
     return dumps
+
+
+def _once(d):
+    """The dump with each component once.
+
+    The editor's ifacefind walks the tree from component 0 and again from component 1, so everything
+    under 1 arrives twice, at two depths, and nested parts more often: interface 518's 376 rows on
+    2026-11-02 were 60 components, and one npc's row came back eight times. A component is its
+    static id and dynamic index; the copies differ in depth only, and the shallowest is kept."""
+    cols = d["columns"]
+    if "static" not in cols or "dynamic" not in cols:
+        return d
+    s, n = cols.index("static"), cols.index("dynamic")
+    depth = cols.index("depth") if "depth" in cols else None
+    best = {}
+    for r in d["rows"]:
+        if not isinstance(r, list) or len(r) != len(cols):
+            continue
+        key = (r[s], r[n])
+        if key not in best or (depth is not None and (r[depth] or 0) < (best[key][depth] or 0)):
+            best[key] = r
+    rows = [r for r in d["rows"] if isinstance(r, list) and len(r) == len(cols) and best.get((r[s], r[n])) is r]
+    d["repeats"] = len(d["rows"]) - len(rows)
+    d["rows"] = rows
+    return d
 
 
 def _ago(t):
@@ -120,6 +145,8 @@ def summary(iface, limit=80):
     # not from the sink
     if d.get("from") and d["from"] != LOG:
         out["source"] = d["from"]
+    if d.get("repeats"):
+        out["repeatsDropped"] = d["repeats"]
     # a dump adding nothing was taken while empty
     if not drawn and not any(r.get("dynamic", -1) >= 0 for r in rows):
         out["note"] += (" Nothing here draws text and no component is a runtime child, so this was "
@@ -157,11 +184,12 @@ def _taken_at(iface):
     return d.get("t", 0)
 
 
-def request(iface, wait=8.0):
+def request(iface, wait=25.0):
     """Ask the running client for a dump of this interface, through the relay.
 
     The plugin picks the command up on its next tick and posts the tree back, so this waits for a
-    stamp newer than whatever was already there. Nobody has to type anything in game."""
+    stamp newer than whatever was already there. Nobody has to type anything in game. Eight
+    seconds was too short: a big tree usually landed after it, and the call said nothing came."""
     before = _taken_at(iface)
     # ifacefind in dump mode, id in quest
     body = json.dumps({"cmd": "ifacefind", "mode": "dump", "quest": str(int(iface))}).encode("utf-8")
@@ -183,8 +211,9 @@ def request(iface, wait=8.0):
             return {"asked": True, "arrived": True}
         time.sleep(0.25)
     return {"asked": True, "arrived": False,
-            "why": "nothing landed in %gs. The client has to be running with quest-dev connected "
-                   "and the interface open on screen." % wait}
+            "why": "nothing landed in %gs. A big tree can take longer: call rs3_iface again without "
+                   "dump in a moment and a late dump is read. If none ever comes, the client has to "
+                   "be running with quest-dev connected and the interface open on screen." % wait}
 
 
 def dumped():

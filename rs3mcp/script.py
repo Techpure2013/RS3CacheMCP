@@ -184,6 +184,11 @@ def tool_script(args):
 
     window = hits[start:]
     notes = [literal] if literal and not hits else []
+    # say the index narrowed it
+    if only is not None and not hits and not literal:
+        notes.append("the word index narrowed this to the %d of %d scripts holding every word of it, "
+                     "and none of them holds it as written. Every script was covered."
+                     % (len(only), len(_files())))
     if len(hits) >= ceiling:
         notes.append("more hits exist; pass start=%d for the next %d" % (ceiling, limit))
     # a typed reference is a keyed lookup instead
@@ -194,6 +199,7 @@ def tool_script(args):
         notes.append("that is a typed reference; rs3_script_refs kind=%s id=%s answers it from an "
                      "index instead of by reading %d files" % (kind, ref.group(2), scanned))
     rec = {"found": len(hits), "filesMatched": matched_files, "filesScanned": scanned,
+           "narrowedByIndex": only is not None,
            "truncated": len(hits) >= ceiling,
            "start": start, "shown": len(window),
            "hits": window,

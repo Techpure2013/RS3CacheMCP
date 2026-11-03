@@ -10,7 +10,7 @@ An add-on offers the needs of its own checks under "needs", in the same shape.
 
 import os
 
-from rs3mcp import addons, common
+from rs3mcp import addons, cachefile, common
 
 NEEDS = {
     "name lists": (lambda: common.name_lists() is not None,
@@ -18,6 +18,8 @@ NEEDS = {
     "add-on": (lambda: bool(addons.load()), "an add-on (RS3MCP_ADDONS)"),
     "previous build": (lambda: os.path.exists(common.DB + ".bak"),
                        "a previous database, which only a second rebuild leaves"),
+    "live cache": (lambda: not cachefile.BETA,
+                   "the live game cache, which these numbers were measured on (RS3MCP_GAME_CACHE is the beta's)"),
 }
 
 

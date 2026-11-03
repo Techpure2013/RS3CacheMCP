@@ -39,6 +39,20 @@ def crcs(root=None, archives=None):
     return out
 
 
+def names_stamp():
+    """A fingerprint of the name lists a build reads. Names come from them, not the cache, so a
+    list that changed is a rebuild even when no group moved."""
+    import hashlib
+    folder = common.name_lists()
+    h = hashlib.sha1()
+    if folder:
+        for f in sorted(os.listdir(folder)):
+            if f.startswith("Vars - ") and f.endswith(".csv"):
+                st = os.stat(os.path.join(folder, f))
+                h.update(("%s|%d|%d;" % (f, st.st_size, int(st.st_mtime))).encode("utf-8"))
+    return h.hexdigest()
+
+
 def load(path=None):
     """The manifest of the last build, or None before there is one."""
     try:
@@ -61,7 +75,7 @@ def save(archives, failures, chunks, path=None):
                    "archives": {str(a): {str(g): c for g, c in sorted(groups.items())}
                                 for a, groups in sorted(archives.items())},
                    "failures": {t: sorted(ids) for t, ids in sorted(failures.items())},
-                   "chunks": chunks}, fh)
+                   "chunks": chunks, "names": names_stamp()}, fh)
     os.replace(tmp, path)
 
 

@@ -14,7 +14,8 @@ The full docs are in [docs](docs/README.md).
 
 ## What you need
 
-- Windows, with RuneScape 3 installed. Log in at least once so the game downloads its cache.
+- Windows or Linux, with RuneScape 3 installed. Log in at least once so the game downloads its
+  cache. On Linux, see [Linux](docs/install.md#linux).
 - Python 3.10 or newer. When you install it, tick "Add python.exe to PATH".
 
 That's it. `rs3 doctor` tells you about anything optional you might want.

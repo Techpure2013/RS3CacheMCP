@@ -140,8 +140,11 @@ def sync(majors, check=False, say=print, root=None):
     {archive: groups fetched}, or with check, the groups that would be. An archive the client
     wrote after that cache was made is left to the client."""
     root = root or cachefile.GAME
+    if cachefile.BETA and root == cachefile.GAME:
+        say("openrs2: the cache is the beta's, and OpenRS2 keeps only live ones, so nothing is fetched")
+        return {}
     cache = latest()
-    done = os.path.join(cachefile.OVERLAY, "synced.json")
+    done =os.path.join(cachefile.OVERLAY, "synced.json")
     try:
         last = json.load(io.open(done, encoding="utf-8"))
     except (OSError, ValueError):

@@ -61,6 +61,7 @@ python rebuild-cache.py --offline          leaves OpenRS2 out, uses the game cac
 python rebuild-cache.py --no-swap          builds and checks, but doesn't install
 python -m rs3mcp.openrs2 [--check]         fetches (or lists) what the game cache is behind on
 python -m rs3mcp.changed                   lists what moved since the last build
+python -m rs3mcp.namesync [folder] [--check]   adds the client's harvested names to the name lists
 ```
 
 To run one step of the rebuild at a time ([how the database is built](rebuild.md)):
