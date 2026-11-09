@@ -83,13 +83,18 @@ class _Configs:
         return self.textures[mid]
 
     def floor(self, kind, tile_id):
-        """The config a tile's floor id names, or None when it draws nothing: no colour, or magenta
-        (rsmv's rule; the floor under it shows instead)."""
+        """The config a tile's floor id names, or None when it draws nothing: no colour, or magenta,
+        the colour the cache gives its draw-nothing floor (config 41)."""
         d = self.floors.get((kind, maptiles.config_id(tile_id)))
         c = (d or {}).get("colour")
         if not c or (c["r"], c["g"], c["b"]) == NO_COLOUR:
             return None
         return d
+
+    def cuts(self, kind, tile_id):
+        """True for a draw-nothing floor: magenta, as config 41 and 34 more overlays."""
+        c = (self.floors.get((kind, maptiles.config_id(tile_id))) or {}).get("colour")
+        return bool(c) and (c["r"], c["g"], c["b"]) == NO_COLOUR
 
     def colour(self, kind, tile_id):
         """A tile floor's colour, or None when it draws nothing."""

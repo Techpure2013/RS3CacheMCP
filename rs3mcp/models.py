@@ -101,8 +101,8 @@ def _decode(b, out):
             material = b.u16le() - 1
             faces = b.u16le()
             colours = b.arr("H", faces) if f["vertices"] else None
-            if f["alpha"]:
-                b.take(faces)
+            # 255 opaque
+            face_alpha = b.take(faces) if f["alpha"] else None
             if f["faceBones"]:
                 b.take(faces * 2)
             lods = b.u8()
@@ -119,10 +119,11 @@ def _decode(b, out):
                 normals = b.take(n * 3)
                 b.take(n * 4)       # tangents
                 uvs = b.take(n * 4)
-                if parts is not None:
+                # hidden meshes are never drawn
+                if parts is not None and not f["hidden"]:
                     parts.append({"positions": positions[-1], "colours": colours, "perFace": True,
                                   "faces": [(material, lod0 or array.array("H"))], "uvs": uvs,
-                                  "normals": normals})
+                                  "normals": normals, "alpha": face_alpha})
             if f["boneIds"]:
                 b.take(n * 2)
             if f["skin"]:
@@ -151,10 +152,11 @@ def _decode(b, out):
             for _ in range(n):
                 b.take(b.u16le() * 2)
                 b.take(b.u16le())
-        colours = None
+        colours = alphas = None
         if f["vertices"]:
             colours = b.arr("H", n)
-            b.take(n)               # alpha
+            # one a vertex, 255 opaque
+            alphas = b.take(n)
         if f["faceBones"]:
             b.take(n * 2)
         got = _renders(b, meshes, n, sum(c * s for c, s in zip(counts[1:], (39, 50, 18, 0))))
@@ -166,12 +168,12 @@ def _decode(b, out):
             if material >= 0:
                 materials.add(material)
             alpha = alpha or rf["alpha"]
-            if parts is not None:
+            if parts is not None and not rf["hidden"]:
                 width = 4 if n > 0xFFFF else 2
                 faces.append((material, _indices(b.b[head:head + k * width], width)))
         if parts is not None and positions:
             parts.append({"positions": positions[0], "colours": colours, "perFace": False, "faces": faces,
-                          "uvs": uvs, "normals": normals})
+                          "uvs": uvs, "normals": normals, "alpha": alphas})
         skinned, bones = f["skin"], f["boneIds"]
     for count, size in zip(counts[1:], (39, 50, 18, 0)):
         b.take(count * size)
@@ -270,8 +272,13 @@ def records(root=None, minors=None):
 def mesh(mid, root=None):
     """One model with every part in one vertex list, or None when it does not decode:
     {"verts": [(x, y, z)], "tris": [(a, b, c, material)], "colours": packed hsl per vertex,
-    "uvs": [(u, v)], "normals": [(x, y, z)] as signed bytes}. A part coloured per face gives each
-    vertex the colour of its last face. Normals face as the triangles wind, counter-clockwise."""
+    "uvs": [(u, v)], "normals": [(x, y, z)] as signed bytes, "alphas": 0-255 per vertex, 255 opaque}.
+    A part coloured per face gives each vertex the colour and alpha of its last face. Normals face as
+    the triangles wind, counter-clockwise."""
+    return cachefile.kept("model", (mid, root), lambda: _mesh(mid, root))
+
+
+def _mesh(mid, root):
     root = root or cachefile.GAME
     files = cachefile.files(MAJOR, mid, root) or {}
     if not files:
@@ -279,7 +286,7 @@ def mesh(mid, root=None):
     out, problem = decode(files[min(files)], mesh=True)
     if problem:
         return None
-    verts, tris, colours, uvs, normals = [], [], [], [], []
+    verts, tris, colours, uvs, normals, alphas = [], [], [], [], [], []
     for part in out["parts"]:
         base = len(verts)
         p = part["positions"]
@@ -293,20 +300,25 @@ def mesh(mid, root=None):
         # half floats, big endian, u then v
         uvs.extend(struct.unpack_from(">ee", raw, i * 4) if (i + 1) * 4 <= len(raw) else (0.0, 0.0)
                    for i in range(n))
-        cols = part["colours"]
-        mine = [0] * n
+        cols, alpha = part["colours"], part.get("alpha")
+        mine, seen = [0] * n, [255] * n
         if cols is not None and not part["perFace"]:
             mine = list(cols[:n]) + [0] * max(0, n - len(cols))
+        if alpha and not part["perFace"]:
+            seen = list(alpha[:n]) + [255] * max(0, n - len(alpha))
         for material, idx in part["faces"]:
             for k, i in enumerate(range(0, len(idx) - 2, 3)):
                 a, b, c = idx[i], idx[i + 1], idx[i + 2]
                 tris.append((base + a, base + b, base + c, material))
-                if cols is not None and part["perFace"] and k < len(cols):
-                    for v in (a, b, c):
-                        if v < n:
+                for v in (a, b, c):
+                    if v < n and part["perFace"]:
+                        if cols is not None and k < len(cols):
                             mine[v] = cols[k]
+                        if alpha and k < len(alpha):
+                            seen[v] = alpha[k]
         colours.extend(mine)
-    return {"verts": verts, "tris": tris, "colours": colours, "uvs": uvs, "normals": normals}
+        alphas.extend(seen)
+    return {"verts": verts, "tris": tris, "colours": colours, "uvs": uvs, "normals": normals, "alphas": alphas}
 
 
 def verify(limit=None):

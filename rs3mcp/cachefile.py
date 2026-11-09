@@ -17,6 +17,7 @@ Hands back bytes. Decodes nothing.
 """
 
 import bz2
+import collections
 import io
 import lzma
 import os
@@ -183,16 +184,56 @@ def _mtime(root, major):
 def _index_root(major, root):
     """Where the newer index for this major is: the overlay when it was written after the client
     last wrote, else root. The client fetches every index it uses on login, so a client file
-    written later holds an index at least as new."""
+    written later holds an index at least as new; but the 11-07 client wrote js5-2 with its index
+    table empty, and then the overlay's is the only one."""
     over = _overlay(major, root)
-    if over is None or _mtime(OVERLAY, major) <= _mtime(root, major):
+    if over is None:
         return root
     try:
         # an unfinished fetch has no index
         held = over.execute("select 1 from cache_index where KEY = 1").fetchone()
     except sqlite3.Error:
         held = None
-    return OVERLAY if held else root
+    if not held:
+        return root
+    if _mtime(OVERLAY, major) > _mtime(root, major):
+        return OVERLAY
+    con = _open(root, major)
+    try:
+        theirs = con is not None and con.execute("select 1 from cache_index where KEY = 1").fetchone()
+    except sqlite3.Error:
+        theirs = None
+    return root if theirs else OVERLAY
+
+
+_FROZEN = None
+# most entries of each kind kept while frozen
+_KEEP = {"descriptor": 64, "texture": 600, "model": 200, "model-arrays": 1500, "ground": 48, "grid": 64,
+         "scene-objects": 2, "configs": 2, "morphs": 2, "floors": 2, "material-row": 4000}
+
+
+def freeze():
+    """Promises that the cache files will not change for the rest of this process, as in a map tile
+    run, so reads are kept and reused instead of checked again. The MCP server never calls it: it
+    has to see the client's updates."""
+    global _FROZEN
+    if _FROZEN is None:
+        _FROZEN = {}
+
+
+def kept(kind, key, make):
+    """make() once per kind and key while frozen, the least recently used dropped past _KEEP[kind];
+    make() every time otherwise. Treat what comes back as read only."""
+    if _FROZEN is None:
+        return make()
+    lru = _FROZEN.setdefault(kind, collections.OrderedDict())
+    if key in lru:
+        lru.move_to_end(key)
+        return lru[key]
+    got = lru[key] = make()
+    if len(lru) > _KEEP[kind]:
+        lru.popitem(last=False)
+    return got
 
 
 def descriptor(major, root=GAME):
@@ -201,6 +242,10 @@ def descriptor(major, root=GAME):
     File ids are sparse, so position in the group is not the id. Kept per index until its stored
     bytes change, since the models index takes most of a second to read. Treat it as read only.
     """
+    return kept("descriptor", (major, root), lambda: _read_descriptor(major, root))
+
+
+def _read_descriptor(major, root):
     root = _index_root(major, root)
     con = _open(root, major)
     if con is None:

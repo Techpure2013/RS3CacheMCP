@@ -94,43 +94,39 @@ def dds(tex, root=None):
     bw, bh = (w + 3) // 4, (h + 3) // 4
     if len(body) < 128 + bw * bh * step:
         return None
-    px = bytearray(w * h * 4)
-    at = 128
-    for by in range(bh):
-        for bx in range(bw):
-            if alpha:
-                a0, a1 = body[at], body[at + 1]
-                bits = int.from_bytes(body[at + 2:at + 8], "little")
-                if a0 > a1:
-                    alphas = [a0, a1] + [((6 - i) * a0 + (1 + i) * a1) // 7 for i in range(6)]
-                else:
-                    alphas = [a0, a1] + [((4 - i) * a0 + (1 + i) * a1) // 5 for i in range(4)] + [0, 255]
-                c = at + 8
-            c0, c1 = struct.unpack_from("<HH", body, c if alpha else at)
-            (r0, g0, b0), (r1, g1, b1) = _expand(c0), _expand(c1)
-            cols = [(r0, g0, b0, 255), (r1, g1, b1, 255)]
-            if c0 > c1 or alpha:
-                # the plus one is the DXT1 page's rounding
-                cols += [((2 * r0 + r1 + 1) // 3, (2 * g0 + g1 + 1) // 3, (2 * b0 + b1 + 1) // 3, 255),
-                         ((r0 + 2 * r1 + 1) // 3, (g0 + 2 * g1 + 1) // 3, (b0 + 2 * b1 + 1) // 3, 255)]
-            else:
-                cols += [((r0 + r1) // 2, (g0 + g1) // 2, (b0 + b1) // 2, 255), (0, 0, 0, 0)]
-            index = struct.unpack_from("<I", body, (c if alpha else at) + 4)[0]
-            for p in range(16):
-                x, y = bx * 4 + p % 4, by * 4 + p // 4
-                if x >= w or y >= h:
-                    continue
-                r, g, b, a = cols[(index >> (2 * p)) & 3]
-                if alpha:
-                    a = alphas[(bits >> (3 * p)) & 7]
-                    if z:
-                        b = z[a * 256 + g]
-                o =(y * w + x) * 4
-                px[o:o + 4] = bytes((r, g, b, a))
-            at += step
-    return _crop(w, h, bytes(px))
+    import numpy as np
+    blocks = np.frombuffer(body, np.uint8, bw * bh * step, 128).reshape(-1, step).astype(np.int64)
+    cb = blocks[:, 8:] if alpha else blocks
+    c0, c1 = cb[:, 0] | cb[:, 1] << 8, cb[:, 2] | cb[:, 3] << 8
+    index = cb[:, 4] | cb[:, 5] << 8 | cb[:, 6] << 16 | cb[:, 7] << 24
+    e0 = np.stack([((c0 >> 11) * 255 + 15) // 31, (((c0 >> 5) & 63) * 255 + 31) // 63, ((c0 & 31) * 255 + 15) // 31], 1)
+    e1 = np.stack([((c1 >> 11) * 255 + 15) // 31, (((c1 >> 5) & 63) * 255 + 31) // 63, ((c1 & 31) * 255 + 15) // 31], 1)
+    four = ((c0 > c1) | alpha)[:, None]
+    # the plus one is the DXT1 page's rounding
+    third = np.where(four, (2 * e0 + e1 + 1) // 3, (e0 + e1) // 2)
+    last = np.where(four, (e0 + 2 * e1 + 1) // 3, 0)
+    solid = np.full((len(blocks), 1), 255)
+    palette = np.stack([np.hstack([e0, solid]), np.hstack([e1, solid]), np.hstack([third, solid]),
+                        np.hstack([last, np.where(four, 255, 0)])], 1)
+    shifts = np.arange(16)
+    pick = (index[:, None] >> (2 * shifts)) & 3
+    px = palette[np.arange(len(blocks))[:, None], pick]
+    if alpha:
+        a0, a1 = blocks[:, 0], blocks[:, 1]
+        bits = sum(blocks[:, 2 + k] << (8 * k) for k in range(6))
+        i6, i4 = np.arange(6), np.arange(4)
+        seven = np.hstack([a0[:, None], a1[:, None], ((6 - i6) * a0[:, None] + (1 + i6) * a1[:, None]) // 7])
+        five = np.hstack([a0[:, None], a1[:, None], ((4 - i4) * a0[:, None] + (1 + i4) * a1[:, None]) // 5,
+                          np.zeros((len(blocks), 1), np.int64), np.full((len(blocks), 1), 255)])
+        alphas = np.where((a0 > a1)[:, None], seven, five)
+        px[:, :, 3] = alphas[np.arange(len(blocks))[:, None], (bits[:, None] >> (3 * shifts)) & 7]
+        if z:
+            px[:, :, 2] = np.frombuffer(z, np.uint8)[px[:, :, 3] * 256 + px[:, :, 1]]
+    # 4 x 4 blocks into rows
+    img =px.reshape(bh, bw, 4, 4, 4).transpose(0, 2, 1, 3, 4).reshape(bh * 4, bw * 4, 4)[:h, :w]
+    return _crop(w, h, img.astype(np.uint8).tobytes())
 
 
 def image(tex, root=None):
     """(width, height, rgba) from bmp when it is on disk, else from dds, else None."""
-    return bmp(tex, root) or dds(tex, root)
+    return cachefile.kept("texture", (tex, root), lambda: bmp(tex, root) or dds(tex, root))

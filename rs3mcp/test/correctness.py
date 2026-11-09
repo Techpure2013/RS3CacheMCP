@@ -674,6 +674,20 @@ def test_mapscene():
     check("mapscene: a wall three tiles long is centred on its run, not its first tile",
           sc.nodes[0]["matrix"][14], 5.5 * mapscene.TILE)
     sc.nodes = []
+    mapscene._place(sc, {"models": [{"shape": 10, "models": [1]}], "offsetX": 10}, 0, 4, 4, 10, 0, {"translateX": 3}, flat)
+    check("mapscene: a config offset counts 4 units a step, a placement's translate 1",
+          sc.nodes[0]["matrix"][12] - 4.5 * mapscene.TILE, 43)
+    sc.nodes = []
+    mapscene._place(sc, {"models": [{"shape": 10, "models": [1]}]}, 0, 4, 4, 10, 0, {"rotation": [23170, 0, 0, 23170]}, flat)
+    check("mapscene: a placement's rotation tilts the model, a quarter turn about x taking up to along z",
+          [round(v, 3) for v in sc.nodes[0]["matrix"][4:7]], [0, 0, -1])
+    sc.nodes = []
+    # a 3x3 loc on a raised middle
+    bump = {p: {(x, z): 100 if 5 <= x <= 6 and 5 <= z <= 6 else 0 for x in range(9) for z in range(9)} for p in range(4)}
+    mapscene._place(sc, {"models": [{"shape": 10, "models": [1]}], "width": 3, "length": 3}, 0, 4, 4, 10, 0, {}, bump)
+    check("mapscene: a loc stands on the ground at its footprint's centre, as the live client sets it",
+          sc.nodes[0]["matrix"][13], 100)
+    sc.nodes = []
     mapscene._place(sc, {"models": [{"shape": 2, "models": [1]}]}, 0, 4, 4, 2, 0, {}, flat)
     check("mapscene: an L corner is two pieces, the first mirrored, the second a quarter turn on",
           [(round(n["matrix"][0]), round(n["matrix"][10])) for n in sc.nodes], [(1, -1), (0, 0)])
@@ -686,11 +700,32 @@ def test_mapscene():
 
     if os.path.exists(os.path.join(cachefile.GAME, "js5-5.jcache")):
         from rs3mcp import mapground
-        img = mapground.texture(3240, 3220, 3249, 3229)
-        wet = mapground.water(3240, 3220, 3249, 3229, mapscene.HEIGHT)
+        from rs3mcp import maptiles
+        tiles, water = maptiles.ground(50, 50)
+        check("maptiles: the NXT ground puts the River Lum's surface (overlay 112) over its bed (underlay 513)",
+              (water[0].get((40, 30), {}).get("overlay"), tiles[0][40][30].get("underlay")), (112, 513))
+        img, wet = mapground.texture(3240, 3220, 3249, 3229, with_water=True)
+        beds = mapscene._heights(50, 50, 50, 50, None)[0]
+        tops = mapscene._heights(50, 50, 50, 50, None, surface=True)[0]
         check("mapground: ten tiles of ground texture, and the River Lum's surface above its bed",
-              (img.size, wet is not None and min(wet["corners"].values()) > 0),
-              ((10 * mapground.PX, 10 * mapground.PX), True))
+              (img.size, wet is not None, any(tops[k] > beds[k] for k in tops), all(tops[k] >= beds[k] for k in tops)),
+              ((10 * mapground.PX, 10 * mapground.PX), True, True, True))
+        # a pit by the Taverley mine, full tile
+        pit = mapground.texture(2955, 3445, 2957, 3446)
+        check("mapground: a draw-nothing overlay is a hole, not the underlay beneath it",
+              pit.getpixel((mapground.PX + mapground.PX // 2, mapground.PX // 2)), (0, 0, 0))
+        # the Al Kharid palace stairs, overlay config 50
+        stairs, _ = mapground.texture(3291, 3177, 3293, 3177, with_water=True)
+        check("mapground: every magenta overlay is a hole in the ground, not config 41 alone",
+              stairs.getpixel((mapground.PX + mapground.PX // 2, mapground.PX // 2))[3], 0)
+        # the shaft by the Taverley house
+        shaft = mapground.texture(2915, 3292, 2919, 3292)
+        check("mapground: a tile with nothing to draw is a hole, not its neighbours' ground",
+              shaft.getpixel((mapground.PX + 4, mapground.PX // 2)), (0, 0, 0))
+        # bridge flag, no deck
+        ridge = mapground.texture(2958, 3455, 2960, 3455)
+        check("mapground: a bridge column with no deck still draws its own ground",
+              max(ridge.getpixel((mapground.PX + mapground.PX // 2, mapground.PX // 2))) > 20, True)
 
     if os.path.exists(os.path.join(cachefile.GAME, "js5-47.jcache")):
         out = os.path.join(tempfile.mkdtemp(), "lumbridge.glb")
@@ -702,6 +737,90 @@ def test_mapscene():
         check("mapscene: Lumbridge's courtyard builds a glTF 2 binary with its locs placed, each with a model",
               (magic, version, total == os.path.getsize(out), got["locs"] > 10, len(doc["nodes"]) > 10, got["noModel"]),
               (0x46546C67, 2, True, True, True, 0))
+        # lily pads in the River Lum
+        seen = {}
+        real = mapscene._place
+
+        def spy(sc, o, p, x, z, shape, rot, extra, heights, shown_on=0):
+            seen[x, z] = heights[p].get((x, z))
+            return real(sc, o, p, x, z, shape, rot, extra, heights, shown_on)
+        mapscene._place = spy
+        try:
+            mapscene.build(3247, 3223, os.path.join(tempfile.mkdtemp(), "pads.glb"), 0, 1, far=False)
+        finally:
+            mapscene._place = real
+        # loc 61370 (7x10) shows 64110 (7x1)
+        sizes = {}
+
+        def footprint(sc, o, p, x, z, shape, rot, extra, heights, shown_on=0):
+            sizes[x, z, shape] = (o.get("width", 1), o.get("length", 1))
+            return real(sc, o, p, x, z, shape, rot, extra, heights, shown_on)
+        mapscene._place = footprint
+        try:
+            mapscene.build(3106, 3509, os.path.join(tempfile.mkdtemp(), "morph.glb"), 0, 1, far=False)
+        finally:
+            mapscene._place = real
+        check("mapscene: a morph stands on the placed loc's footprint, as the live client centres it",
+              sizes.get((3106, 3509, 10)), (7, 10))
+        beds = mapscene._heights(50, 50, 50, 50, None)[0]
+        tops = mapscene._heights(50, 50, 50, 50, None, surface=True)[0]
+        check("mapscene: a loc on water stands on the surface, as the live client stands it, not on the bed",
+              (seen.get((3247, 3223)), beds[3247, 3223] < tops[3247, 3223]), (tops[3247, 3223], True))
+        # two vertices a tile apart on ground rising 100 a tile east
+        import array
+        sc = mapscene._Scene()
+        sc.lay({p: {(x, z): x * 100 for x in range(9) for z in range(9)} for p in range(4)}, 0, 0, 9, 9)
+        sc.positions[0] = array.array("f", [-256, 0, 0, 256, 0, 0])
+        sc.glb.gltf["meshes"].append({"primitives": [{"attributes": {"POSITION": 0}}]})
+        at = 4.5 * mapscene.TILE
+        bent = sc.glb.gltf["meshes"][sc.follow(0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, at, 450, at, 1], 0, 450)]
+        view = sc.glb.gltf["bufferViews"][sc.glb.gltf["accessors"][bent["primitives"][0]["attributes"]["POSITION"]]["bufferView"]]
+        ys = np.frombuffer(bytes(sc.glb.bin[view["byteOffset"]:view["byteOffset"] + view["byteLength"]]), np.float32)[1::3]
+        check("mapscene: a loc that follows the ground takes the height under each of its vertices",
+              [round(float(y)) for y in ys], [-50, 50])
+        # loc 3700's marker plane, alpha 0
+        sc = mapscene._Scene()
+        check("mapscene: a model whose faces are all fully see-through draws nothing and is not missing",
+              (sc.mesh((64543,), (), ()), ((64543,), (), ()) in sc.unseen), (None, True))
+        # Burthorpe tent floor, helper 86356 over planks
+        meshed = set()
+        real_mesh = mapscene._Scene.mesh
+
+        def made(sc, mids, recolour, retexture):
+            meshed.add(tuple(mids))
+            return real_mesh(sc, mids, recolour, retexture)
+        mapscene._Scene.mesh = made
+        try:
+            mapscene.build(2930, 3567, os.path.join(tempfile.mkdtemp(), "tent.glb"), 0, 12, far=False)
+        finally:
+            mapscene._Scene.mesh = real_mesh
+        check("mapscene: a floor-raise helper, one plain square, is left out; the floor it lifts is drawn",
+              ((87519,) in meshed, (87482,) in meshed), (False, True))
+        # wheat's square and the scarecrow's shadow
+        square = lambda mid: mapscene._ground_square(mapscene._model_arrays(mid, None))
+        check("mapscene: a plain flat square on a model's base is found, a solid model has none",
+              (int(square(25302).sum()), bool(square(7767).all()), square(139166) is None), (2, True, True))
+        sc = mapscene._Scene()
+
+        def faces(mids):
+            prims = sc.glb.gltf["meshes"][sc.mesh(mids, (), ())]["primitives"]
+            return sum(sc.glb.gltf["accessors"][p["indices"]]["count"] for p in prims) // 3
+        check("mapscene: that square is dropped beside real faces, kept when it is all the loc has",
+              (faces((25302,)), faces((139166, 7767)), faces((7767,))), (268, 488, 2))
+        # loc 116084, a black haze fading out
+        sc = mapscene._Scene()
+        haze = sc.glb.gltf["meshes"][sc.mesh((106495,), ((28058, 0),), ())]
+        colour = sc.glb.gltf["accessors"][haze["primitives"][0]["attributes"]["COLOR_0"]]
+        view = sc.glb.gltf["bufferViews"][colour["bufferView"]]
+        alpha = np.frombuffer(bytes(sc.glb.bin[view["byteOffset"]:view["byteOffset"] + view["byteLength"]]), np.uint16)[3::4]
+        check("mapscene: faces whose vertex colour is partly clear blend, their alpha carried as it is",
+              ("BLEND" in {sc.glb.gltf["materials"][p["material"]].get("alphaMode") for p in haze["primitives"]},
+               int(alpha.min()) < 65535 // 4), (True, True))
+        # Draynor Manor's grey planks, brown floor
+        planks = mapground.Floors().laid_out("overlays", 5, 0, 0, 2, 2)
+        r, g, b = (float(planks[..., k].mean()) for k in range(3))
+        check("mapground: a floor material keeping none of its base colour is tinted by the floor's",
+              r > b + 25, True)
         # a leaf material, layout v1
         sc, leaf = mapscene._Scene(), 5463
         used = sc.material(leaf)
