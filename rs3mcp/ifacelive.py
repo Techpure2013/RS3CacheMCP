@@ -86,20 +86,25 @@ def _once(d):
     The editor's ifacefind walks the tree from component 0 and again from component 1, so everything
     under 1 arrives twice, at two depths, and nested parts more often: interface 518's 376 rows on
     2026-11-02 were 60 components, and one npc's row came back eight times. A component is its
-    static id and dynamic index; the copies differ in depth only, and the shallowest is kept."""
+    static id, category and dynamic index: 1473:9 has dyn 2 in category 0 and in category 1, two
+    different buttons. The copies differ in depth only, and the shallowest is kept."""
     cols = d["columns"]
     if "static" not in cols or "dynamic" not in cols:
         return d
-    s, n = cols.index("static"), cols.index("dynamic")
+    parts = [cols.index(c) for c in ("static", "category", "dynamic") if c in cols]
     depth = cols.index("depth") if "depth" in cols else None
+
+    def key(r):
+        return tuple(r[i] for i in parts)
+
     best = {}
     for r in d["rows"]:
         if not isinstance(r, list) or len(r) != len(cols):
             continue
-        key = (r[s], r[n])
-        if key not in best or (depth is not None and (r[depth] or 0) < (best[key][depth] or 0)):
-            best[key] = r
-    rows = [r for r in d["rows"] if isinstance(r, list) and len(r) == len(cols) and best.get((r[s], r[n])) is r]
+        k = key(r)
+        if k not in best or (depth is not None and (r[depth] or 0) < (best[k][depth] or 0)):
+            best[k] = r
+    rows = [r for r in d["rows"] if isinstance(r, list) and len(r) == len(cols) and best.get(key(r)) is r]
     d["repeats"] = len(d["rows"]) - len(rows)
     d["rows"] = rows
     return d
